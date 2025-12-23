@@ -132,6 +132,30 @@ export default class PreloadScene extends Phaser.Scene {
     fastBoxGraphics.generateTexture('ammoFast', 24, 24);
     fastBoxGraphics.destroy();
 
+    // Bala de teletransporte (cian/portal)
+    const teleportBulletGraphics = this.add.graphics();
+    teleportBulletGraphics.fillStyle(0x00FFFF, 1);
+    teleportBulletGraphics.fillCircle(8, 8, 8);
+    teleportBulletGraphics.fillStyle(0xFF00FF, 1);
+    teleportBulletGraphics.fillCircle(8, 8, 5);
+    teleportBulletGraphics.fillStyle(0xFFFFFF, 1);
+    teleportBulletGraphics.fillCircle(8, 8, 2);
+    teleportBulletGraphics.generateTexture('teleportBullet', 16, 16);
+    teleportBulletGraphics.destroy();
+
+    // Powerup teletransporte
+    const teleportBoxGraphics = this.add.graphics();
+    teleportBoxGraphics.fillStyle(0x008B8B, 1);
+    teleportBoxGraphics.fillRect(0, 0, 24, 24);
+    teleportBoxGraphics.fillStyle(0x00FFFF, 1);
+    teleportBoxGraphics.fillRect(2, 2, 20, 20);
+    teleportBoxGraphics.fillStyle(0xFF00FF, 1);
+    teleportBoxGraphics.fillCircle(12, 12, 6);
+    teleportBoxGraphics.fillStyle(0xFFFFFF, 1);
+    teleportBoxGraphics.fillCircle(12, 12, 3);
+    teleportBoxGraphics.generateTexture('ammoTeleport', 24, 24);
+    teleportBoxGraphics.destroy();
+
     // Pulpo - mejorado con tentáculos
     const octopusGraphics = this.add.graphics();
     octopusGraphics.fillStyle(0xFF1493, 1);

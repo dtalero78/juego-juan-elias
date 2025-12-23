@@ -244,7 +244,8 @@ export default class GameScene extends Phaser.Scene {
         fire: { texture: 'fireBullet', speed: 450, damage: 2 },
         ice: { texture: 'iceBullet', speed: 350, damage: 1, slow: true },
         triple: { texture: 'tripleBullet', speed: 400, damage: 1, count: 3 },
-        fast: { texture: 'fastBullet', speed: 800, damage: 1 }
+        fast: { texture: 'fastBullet', speed: 800, damage: 1 },
+        teleport: { texture: 'teleportBullet', speed: 350, damage: 0, isTeleport: true }
       };
 
       const config = bulletConfig[bulletType] || bulletConfig.normal;
@@ -266,6 +267,30 @@ export default class GameScene extends Phaser.Scene {
             );
           }
         });
+      } else if (config.isTeleport) {
+        // Bala de teletransporte - viaja en arco
+        const bullet = this.bullets.get(x, y, config.texture);
+        if (bullet) {
+          bullet.setActive(true);
+          bullet.setVisible(true);
+          bullet.body.reset(x, y);
+          bullet.setVelocity(config.speed, -200); // Arco hacia arriba
+          bullet.damage = config.damage;
+          bullet.bulletType = bulletType;
+          bullet.isTeleport = true;
+          bullet.body.allowGravity = true;
+          bullet.body.setGravityY(300);
+          bullet.setScale(1.2);
+
+          // Efecto de brillo
+          this.tweens.add({
+            targets: bullet,
+            alpha: 0.5,
+            duration: 100,
+            yoyo: true,
+            repeat: -1
+          });
+        }
       } else {
         const bullet = this.bullets.get(x, y, config.texture);
         if (bullet) {
@@ -468,9 +493,23 @@ export default class GameScene extends Phaser.Scene {
       this.createFireArea(bullet.x, bullet.y);
     }
 
+    // Efecto de TELETRANSPORTE - teletransportar al delfín a la posición del impacto
+    if (bulletType === 'teleport') {
+      // Limpiar el tween de parpadeo
+      this.tweens.killTweensOf(bullet);
+      bullet.body.allowGravity = false;
+      // Teletransportar cerca del villano pero no encima
+      this.teleportDolphin(bullet.x - 80, bullet.y);
+      // Causar 2 de daño adicional por el impacto directo
+      if (octopus.active) {
+        octopus.takeDamage();
+        octopus.takeDamage();
+      }
+    }
+
     // Actualizar UI
     if (this.healthText && octopus.active) {
-      this.healthText.setText(`Vida Villano: ${octopus.health}/100`);
+      this.healthText.setText(`Villano: ${octopus.health}`);
     }
   }
 
@@ -640,7 +679,8 @@ export default class GameScene extends Phaser.Scene {
       fire: { type: 'fire', texture: 'ammoFire', amount: 5 },
       ice: { type: 'ice', texture: 'ammoIce', amount: 5 },
       triple: { type: 'triple', texture: 'ammoTriple', amount: 3 },
-      fast: { type: 'fast', texture: 'ammoFast', amount: 5 }
+      fast: { type: 'fast', texture: 'ammoFast', amount: 5 },
+      teleport: { type: 'teleport', texture: 'ammoTeleport', amount: 3 }
     };
 
     // Solo usar los tipos seleccionados
@@ -708,19 +748,106 @@ export default class GameScene extends Phaser.Scene {
       fire: 'Fuego',
       ice: 'Hielo',
       triple: 'Triple',
-      fast: 'Rápida'
+      fast: 'Rápida',
+      teleport: 'Teleport'
     };
     const typeColors = {
       normal: '#FFD700',
       fire: '#FF4500',
       ice: '#00BFFF',
       triple: '#00FF00',
-      fast: '#9400D3'
+      fast: '#9400D3',
+      teleport: '#00FFFF'
     };
 
     const currentAmmo = ammo[currentType];
     this.ammoText.setText(`Balas: ${currentAmmo} [${typeNames[currentType]}]`);
     this.ammoText.setFill(typeColors[currentType]);
+  }
+
+  // Teletransportar al delfín a la posición de la bala
+  teleportDolphin(x, y) {
+    if (!this.dolphin || !this.dolphin.active) return;
+
+    // Guardar posición original para efecto
+    const originalX = this.dolphin.x;
+    const originalY = this.dolphin.y;
+
+    // Efecto de desaparición en posición original
+    const disappearEffect = this.add.circle(originalX, originalY, 30, 0x00FFFF, 0.8);
+    this.tweens.add({
+      targets: disappearEffect,
+      scale: 2,
+      alpha: 0,
+      duration: 300,
+      onComplete: () => disappearEffect.destroy()
+    });
+
+    // Limitar Y para no teletransportarse debajo del suelo
+    const safeY = Math.min(y, 580);
+    // Limitar X para no salirse de la pantalla
+    const safeX = Phaser.Math.Clamp(x, 50, 750);
+
+    // Teletransportar
+    this.dolphin.setPosition(safeX, safeY);
+    this.dolphin.setVelocity(0, 0);
+    this.dolphin.isInAir = true;
+
+    // Efecto de aparición en nueva posición
+    const appearEffect = this.add.circle(safeX, safeY, 5, 0xFF00FF, 1);
+    this.tweens.add({
+      targets: appearEffect,
+      scale: 6,
+      alpha: 0,
+      duration: 300,
+      onComplete: () => appearEffect.destroy()
+    });
+
+    // Sonido de teletransporte (reusar dash)
+    this.soundGen.play('dash');
+
+    // Breve invulnerabilidad después de teletransporte
+    this.dolphin.invulnerable = true;
+    this.dolphin.setTint(0x00FFFF);
+    this.time.delayedCall(500, () => {
+      if (this.dolphin && this.dolphin.active) {
+        this.dolphin.invulnerable = false;
+        this.dolphin.clearTint();
+      }
+    });
+  }
+
+  // Actualizar balas de teletransporte
+  updateTeleportBullets() {
+    this.bullets.getChildren().forEach(bullet => {
+      if (!bullet.active || !bullet.isTeleport) return;
+
+      // Si la bala toca el suelo (Y > 600), teletransportar
+      if (bullet.y > 600) {
+        this.teleportDolphin(bullet.x, 580);
+        bullet.setActive(false);
+        bullet.setVisible(false);
+        bullet.body.allowGravity = false;
+        this.tweens.killTweensOf(bullet);
+      }
+
+      // Si la bala sale de la pantalla por la derecha, teletransportar
+      if (bullet.x > 780) {
+        this.teleportDolphin(750, bullet.y);
+        bullet.setActive(false);
+        bullet.setVisible(false);
+        bullet.body.allowGravity = false;
+        this.tweens.killTweensOf(bullet);
+      }
+
+      // Si la bala sale por arriba, destruirla sin teletransporte
+      if (bullet.y < -50) {
+        bullet.setActive(false);
+        bullet.setVisible(false);
+        bullet.body.allowGravity = false;
+        this.tweens.killTweensOf(bullet);
+      }
+    });
   }
 
   update() {
@@ -750,6 +877,8 @@ export default class GameScene extends Phaser.Scene {
       });
       // Actualizar balas especiales del villano (homing, bombs)
       this.updateOctopusBullets();
+      // Actualizar balas de teletransporte
+      this.updateTeleportBullets();
     }
   }
 

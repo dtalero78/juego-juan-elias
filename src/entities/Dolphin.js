@@ -38,7 +38,8 @@ export default class Dolphin extends Phaser.Physics.Arcade.Sprite {
       fire: 15,
       ice: 15,
       triple: 10,
-      fast: 15
+      fast: 15,
+      teleport: 5
     };
 
     selectedBullets.forEach(type => {

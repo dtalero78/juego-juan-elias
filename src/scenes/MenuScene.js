@@ -48,17 +48,18 @@ export default class MenuScene extends Phaser.Scene {
       { type: 'fire', name: 'Fuego', color: '#FF4500', desc: 'Quema', descFull: 'Daño: 2 | Quema al enemigo' },
       { type: 'ice', name: 'Hielo', color: '#00BFFF', desc: 'Congela', descFull: 'Daño: 1 | Congela 2 seg' },
       { type: 'triple', name: 'Triple', color: '#00FF00', desc: '3 balas', descFull: 'Daño: 1 | Dispara 3 balas' },
-      { type: 'fast', name: 'Rápida', color: '#9400D3', desc: 'Veloz', descFull: 'Daño: 1 | Velocidad x2' }
+      { type: 'fast', name: 'Rápida', color: '#9400D3', desc: 'Veloz', descFull: 'Daño: 1 | Velocidad x2' },
+      { type: 'teleport', name: 'Teleport', color: '#00FFFF', desc: 'Teletransporta', descFull: 'Daño: 2 | Te teletransporta' }
     ];
 
     this.bulletButtons = [];
     this.selectedBullets = [];
 
-    // Ajustes para móvil
-    const startY = this.isMobileDevice ? 170 : 220;
-    const spacing = this.isMobileDevice ? 50 : 60;
+    // Ajustes para móvil (6 tipos de balas ahora)
+    const startY = this.isMobileDevice ? 155 : 180;
+    const spacing = this.isMobileDevice ? 42 : 52;
     const btnWidth = this.isMobileDevice ? 300 : 350;
-    const btnHeight = this.isMobileDevice ? 42 : 50;
+    const btnHeight = this.isMobileDevice ? 36 : 45;
     const nameSize = this.isMobileDevice ? '16px' : '20px';
     const descSize = this.isMobileDevice ? '10px' : '12px';
 
