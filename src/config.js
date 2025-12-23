@@ -3,9 +3,14 @@ import PreloadScene from './scenes/PreloadScene.js';
 import MenuScene from './scenes/MenuScene.js';
 import GameScene from './scenes/GameScene.js';
 
-// Detectar si es dispositivo móvil
-export const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
-  (window.innerWidth <= 800 && 'ontouchstart' in window);
+// Detectar si es dispositivo móvil o tablet
+// iPad con Safari moderno reporta como MacOS, hay que detectarlo por touch + plataforma
+const isIPad = (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) ||
+  /iPad/i.test(navigator.userAgent);
+
+export const isMobile = /Android|webOS|iPhone|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+  isIPad ||
+  ('ontouchstart' in window && navigator.maxTouchPoints > 1);
 
 export const config = {
   type: Phaser.AUTO,
