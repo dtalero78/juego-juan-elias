@@ -2,22 +2,44 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#1a5f7a">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>👿</text></svg>">
   <title>Mielito el Fugitivo</title>
   <style>
-    body {
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+    html, body {
       margin: 0;
       padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      touch-action: none;
+    }
+    body {
       display: flex;
       justify-content: center;
       align-items: center;
       min-height: 100vh;
+      min-height: -webkit-fill-available;
       background: linear-gradient(to bottom, #1a5f7a 0%, #002233 100%);
       font-family: 'Courier New', monospace;
     }
     #game-container {
       box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+      max-width: 100vw;
+      max-height: 100vh;
+    }
+    #game-container canvas {
+      display: block;
+      max-width: 100%;
+      max-height: 100%;
     }
   </style>
 </head>

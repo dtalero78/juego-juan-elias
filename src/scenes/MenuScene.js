@@ -1,18 +1,25 @@
 import Phaser from 'phaser';
+import { isMobile } from '../config.js';
 
 export default class MenuScene extends Phaser.Scene {
   constructor() {
     super('MenuScene');
     this.selectedBullets = [];
+    this.isMobileDevice = isMobile;
   }
 
   create() {
     // Fondo
     this.cameras.main.setBackgroundColor('#1a1a2e');
 
+    // Tamaños adaptados para móvil
+    const titleSize = this.isMobileDevice ? '28px' : '42px';
+    const subtitleSize = this.isMobileDevice ? '14px' : '18px';
+    const selectSize = this.isMobileDevice ? '13px' : '16px';
+
     // Título del juego
-    const title = this.add.text(400, 60, 'MIELITO EL FUGITIVO', {
-      fontSize: '42px',
+    const title = this.add.text(400, 50, 'MIELITO EL FUGITIVO', {
+      fontSize: titleSize,
       fill: '#FFD700',
       fontFamily: 'Courier New',
       fontStyle: 'bold'
@@ -20,62 +27,74 @@ export default class MenuScene extends Phaser.Scene {
     title.setOrigin(0.5);
 
     // Subtítulo
-    const subtitle = this.add.text(400, 110, 'Escapa del villano demoniaco', {
-      fontSize: '18px',
+    const subtitle = this.add.text(400, 90, 'Escapa del villano demoniaco', {
+      fontSize: subtitleSize,
       fill: '#aaa',
       fontFamily: 'Courier New'
     });
     subtitle.setOrigin(0.5);
 
     // Instrucciones de selección
-    const selectText = this.add.text(400, 160, 'Selecciona 2 tipos de balas para la batalla:', {
-      fontSize: '16px',
+    const selectText = this.add.text(400, 130, 'Selecciona 2 tipos de balas:', {
+      fontSize: selectSize,
       fill: '#fff',
       fontFamily: 'Courier New'
     });
     selectText.setOrigin(0.5);
 
-    // Tipos de balas disponibles
+    // Tipos de balas disponibles con descripciones cortas para móvil
     this.bulletTypes = [
-      { type: 'normal', name: 'Normal', color: '#FFD700', desc: 'Daño: 3 | Velocidad media' },
-      { type: 'fire', name: 'Fuego', color: '#FF4500', desc: 'Daño: 2 | Quema al enemigo' },
-      { type: 'ice', name: 'Hielo', color: '#00BFFF', desc: 'Daño: 1 | Ralentiza 3 seg' },
-      { type: 'triple', name: 'Triple', color: '#00FF00', desc: 'Daño: 1 | Dispara 3 balas' },
-      { type: 'fast', name: 'Rápida', color: '#9400D3', desc: 'Daño: 1 | Velocidad x2' }
+      { type: 'normal', name: 'Normal', color: '#FFD700', desc: 'Daño: 3', descFull: 'Daño: 3 | Velocidad media' },
+      { type: 'fire', name: 'Fuego', color: '#FF4500', desc: 'Quema', descFull: 'Daño: 2 | Quema al enemigo' },
+      { type: 'ice', name: 'Hielo', color: '#00BFFF', desc: 'Congela', descFull: 'Daño: 1 | Congela 2 seg' },
+      { type: 'triple', name: 'Triple', color: '#00FF00', desc: '3 balas', descFull: 'Daño: 1 | Dispara 3 balas' },
+      { type: 'fast', name: 'Rápida', color: '#9400D3', desc: 'Veloz', descFull: 'Daño: 1 | Velocidad x2' }
     ];
 
     this.bulletButtons = [];
     this.selectedBullets = [];
 
+    // Ajustes para móvil
+    const startY = this.isMobileDevice ? 170 : 220;
+    const spacing = this.isMobileDevice ? 50 : 60;
+    const btnWidth = this.isMobileDevice ? 300 : 350;
+    const btnHeight = this.isMobileDevice ? 42 : 50;
+    const nameSize = this.isMobileDevice ? '16px' : '20px';
+    const descSize = this.isMobileDevice ? '10px' : '12px';
+
     // Crear botones de selección de balas
     this.bulletTypes.forEach((bullet, index) => {
-      const y = 220 + index * 60;
+      const y = startY + index * spacing;
 
       // Fondo del botón
-      const bg = this.add.rectangle(400, y, 350, 50, 0x333355);
+      const bg = this.add.rectangle(400, y, btnWidth, btnHeight, 0x333355);
       bg.setInteractive({ useHandCursor: true });
       bg.setStrokeStyle(2, 0x555577);
 
       // Nombre de la bala
-      const nameText = this.add.text(250, y, bullet.name, {
-        fontSize: '20px',
+      const nameX = this.isMobileDevice ? 270 : 250;
+      const nameText = this.add.text(nameX, y, bullet.name, {
+        fontSize: nameSize,
         fill: bullet.color,
         fontFamily: 'Courier New',
         fontStyle: 'bold'
       });
       nameText.setOrigin(0, 0.5);
 
-      // Descripción
-      const descText = this.add.text(550, y, bullet.desc, {
-        fontSize: '12px',
+      // Descripción (más corta en móvil)
+      const descX = this.isMobileDevice ? 520 : 550;
+      const descContent = this.isMobileDevice ? bullet.desc : bullet.descFull;
+      const descText = this.add.text(descX, y, descContent, {
+        fontSize: descSize,
         fill: '#aaa',
         fontFamily: 'Courier New'
       });
       descText.setOrigin(1, 0.5);
 
       // Indicador de selección
-      const checkmark = this.add.text(600, y, '', {
-        fontSize: '24px',
+      const checkX = this.isMobileDevice ? 560 : 600;
+      const checkmark = this.add.text(checkX, y, '', {
+        fontSize: this.isMobileDevice ? '20px' : '24px',
         fill: '#00FF00',
         fontFamily: 'Courier New'
       });
@@ -89,7 +108,7 @@ export default class MenuScene extends Phaser.Scene {
         selected: false
       });
 
-      // Evento de click
+      // Evento de click/touch
       bg.on('pointerdown', () => {
         this.toggleBulletSelection(index);
       });
@@ -107,33 +126,49 @@ export default class MenuScene extends Phaser.Scene {
       });
     });
 
+    // Posiciones adaptadas para móvil
+    const selectionY = this.isMobileDevice ? 440 : 530;
+    const playBtnY = this.isMobileDevice ? 480 : 570;
+    const controlsY = this.isMobileDevice ? 530 : 620;
+
     // Texto de selección actual
-    this.selectionText = this.add.text(400, 530, 'Selecciona 2 tipos de balas', {
-      fontSize: '14px',
+    this.selectionText = this.add.text(400, selectionY, 'Selecciona 2 tipos de balas', {
+      fontSize: this.isMobileDevice ? '12px' : '14px',
       fill: '#ff6666',
       fontFamily: 'Courier New'
     });
     this.selectionText.setOrigin(0.5);
 
     // Botón de jugar
-    this.playButton = this.add.rectangle(400, 570, 200, 50, 0x444444);
+    const playBtnWidth = this.isMobileDevice ? 160 : 200;
+    const playBtnHeight = this.isMobileDevice ? 45 : 50;
+    this.playButton = this.add.rectangle(400, playBtnY, playBtnWidth, playBtnHeight, 0x444444);
     this.playButton.setStrokeStyle(2, 0x666666);
 
-    this.playButtonText = this.add.text(400, 570, 'JUGAR', {
-      fontSize: '24px',
+    this.playButtonText = this.add.text(400, playBtnY, 'JUGAR', {
+      fontSize: this.isMobileDevice ? '20px' : '24px',
       fill: '#666666',
       fontFamily: 'Courier New',
       fontStyle: 'bold'
     });
     this.playButtonText.setOrigin(0.5);
 
-    // Instrucciones de controles
-    const controls = this.add.text(400, 620, 'Controles: A/D = Mover | W = Saltar | ESPACIO = Disparar | Q = Cambiar bala', {
-      fontSize: '11px',
-      fill: '#666',
-      fontFamily: 'Courier New'
-    });
-    controls.setOrigin(0.5);
+    // Instrucciones de controles (solo en desktop)
+    if (!this.isMobileDevice) {
+      const controls = this.add.text(400, controlsY, 'Controles: A/D = Mover | W = Saltar | ESPACIO = Disparar | Q = Cambiar bala', {
+        fontSize: '11px',
+        fill: '#666',
+        fontFamily: 'Courier New'
+      });
+      controls.setOrigin(0.5);
+    } else {
+      const mobileHint = this.add.text(400, controlsY, 'Usa los controles táctiles en pantalla', {
+        fontSize: '10px',
+        fill: '#666',
+        fontFamily: 'Courier New'
+      });
+      mobileHint.setOrigin(0.5);
+    }
   }
 
   toggleBulletSelection(index) {

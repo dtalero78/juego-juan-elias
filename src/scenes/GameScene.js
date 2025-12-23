@@ -5,12 +5,16 @@ import Octopus from '../entities/Octopus.js';
 import OctopusBullet from '../entities/OctopusBullet.js';
 import Platform from '../entities/Platform.js';
 import SoundGenerator from '../utils/SoundGenerator.js';
+import TouchControls from '../ui/TouchControls.js';
+import { isMobile } from '../config.js';
 
 export default class GameScene extends Phaser.Scene {
   constructor() {
     super('GameScene');
     this.selectedBullets = ['normal', 'fire']; // Default
     this.soundGen = null;
+    this.touchControls = null;
+    this.isMobileDevice = isMobile;
   }
 
   init(data) {
@@ -110,6 +114,12 @@ export default class GameScene extends Phaser.Scene {
       }
     });
 
+    // Crear controles táctiles si es dispositivo móvil
+    if (this.isMobileDevice) {
+      this.touchControls = new TouchControls(this);
+      this.touchControls.create();
+    }
+
     // Grupo para powerups
     this.powerups = this.physics.add.group();
 
@@ -157,35 +167,49 @@ export default class GameScene extends Phaser.Scene {
   }
 
   createUI() {
+    // Tamaños adaptados para móvil
+    const fontSize = this.isMobileDevice ? '14px' : '20px';
+    const smallFontSize = this.isMobileDevice ? '12px' : '16px';
+
     // Vida del delfín
-    this.dolphinHealthText = this.add.text(10, 20, 'Vida: 3/3', {
-      fontSize: '20px',
+    this.dolphinHealthText = this.add.text(10, 10, 'Vida: 3/3', {
+      fontSize: fontSize,
       fill: '#006400',
-      fontFamily: 'Courier New'
+      fontFamily: 'Courier New',
+      backgroundColor: '#ffffffaa',
+      padding: { x: 5, y: 2 }
     });
 
     // Munición
-    this.ammoText = this.add.text(10, 45, 'Balas: 20 [Normal]', {
-      fontSize: '16px',
+    this.ammoText = this.add.text(10, 35, 'Balas: 20 [Normal]', {
+      fontSize: smallFontSize,
       fill: '#FFD700',
-      fontFamily: 'Courier New'
+      fontFamily: 'Courier New',
+      backgroundColor: '#000000aa',
+      padding: { x: 5, y: 2 }
     });
 
-    // Vida del pulpo
-    this.healthText = this.add.text(580, 20, 'Vida Villano: 100/100', {
-      fontSize: '18px',
+    // Vida del pulpo - ajustar posición para móvil
+    const villainTextX = this.isMobileDevice ? 500 : 580;
+    this.healthText = this.add.text(villainTextX, 10, 'Villano: 100', {
+      fontSize: smallFontSize,
       fill: '#8B0000',
-      fontFamily: 'Courier New'
+      fontFamily: 'Courier New',
+      backgroundColor: '#ffffffaa',
+      padding: { x: 5, y: 2 }
     });
 
-    this.instructionsText = this.add.text(10, 70, 'A/D: Mover | W: Saltar | ESPACIO: Disparar | Q: Cambiar bala | X: Dash', {
-      fontSize: '11px',
-      fill: '#333',
-      fontFamily: 'Courier New'
-    });
+    // Instrucciones solo en desktop
+    if (!this.isMobileDevice) {
+      this.instructionsText = this.add.text(10, 60, 'A/D: Mover | W: Saltar | ESPACIO: Disparar | Q: Cambiar bala | X: Dash', {
+        fontSize: '11px',
+        fill: '#333',
+        fontFamily: 'Courier New'
+      });
+    }
 
     this.gameOverText = this.add.text(400, 300, '', {
-      fontSize: '48px',
+      fontSize: this.isMobileDevice ? '32px' : '48px',
       fill: '#ff0000',
       fontFamily: 'Courier New',
       align: 'center'
@@ -194,7 +218,7 @@ export default class GameScene extends Phaser.Scene {
     this.gameOverText.setVisible(false);
 
     this.restartText = this.add.text(400, 360, '', {
-      fontSize: '20px',
+      fontSize: this.isMobileDevice ? '16px' : '20px',
       fill: '#fff',
       fontFamily: 'Courier New',
       align: 'center'
@@ -537,12 +561,21 @@ export default class GameScene extends Phaser.Scene {
     this.physics.pause();
     this.soundGen.play('gameOver');
 
+    // Ocultar controles táctiles
+    if (this.touchControls) {
+      this.touchControls.destroy();
+    }
+
     this.gameOverText.setText('MORISTE');
     this.gameOverText.setVisible(true);
 
-    this.restartText.setText('Presiona R para reintentar\nPresiona M para volver al menú');
+    const restartMsg = this.isMobileDevice
+      ? 'Toca aquí para reintentar'
+      : 'Presiona R para reintentar\nPresiona M para volver al menú';
+    this.restartText.setText(restartMsg);
     this.restartText.setVisible(true);
 
+    // Controles de teclado
     this.input.keyboard.once('keydown-R', () => {
       this.scene.restart();
     });
@@ -550,6 +583,14 @@ export default class GameScene extends Phaser.Scene {
     this.input.keyboard.once('keydown-M', () => {
       this.scene.start('MenuScene');
     });
+
+    // Control táctil para reiniciar
+    if (this.isMobileDevice) {
+      this.restartText.setInteractive();
+      this.restartText.once('pointerdown', () => {
+        this.scene.restart();
+      });
+    }
   }
 
   handleVictory() {
@@ -557,13 +598,22 @@ export default class GameScene extends Phaser.Scene {
     this.physics.pause();
     this.soundGen.play('victory');
 
+    // Ocultar controles táctiles
+    if (this.touchControls) {
+      this.touchControls.destroy();
+    }
+
     this.gameOverText.setFill('#00ff00');
     this.gameOverText.setText('¡VICTORIA!\nMielito escapó');
     this.gameOverText.setVisible(true);
 
-    this.restartText.setText('Presiona R para jugar de nuevo\nPresiona M para volver al menú');
+    const restartMsg = this.isMobileDevice
+      ? 'Toca aquí para jugar de nuevo'
+      : 'Presiona R para jugar de nuevo\nPresiona M para volver al menú';
+    this.restartText.setText(restartMsg);
     this.restartText.setVisible(true);
 
+    // Controles de teclado
     this.input.keyboard.once('keydown-R', () => {
       this.scene.restart();
     });
@@ -571,6 +621,14 @@ export default class GameScene extends Phaser.Scene {
     this.input.keyboard.once('keydown-M', () => {
       this.scene.start('MenuScene');
     });
+
+    // Control táctil para reiniciar
+    if (this.isMobileDevice) {
+      this.restartText.setInteractive();
+      this.restartText.once('pointerdown', () => {
+        this.scene.restart();
+      });
+    }
   }
 
   // Lluvia de munición (solo los tipos seleccionados)
@@ -667,7 +725,22 @@ export default class GameScene extends Phaser.Scene {
 
   update() {
     if (!this.gameOver && !this.gameWon) {
-      this.dolphin.update(this.cursors, this.wasd, this.spaceBar, this.xKey);
+      // Usar controles táctiles o de teclado según el dispositivo
+      let cursors, wasd, spaceBar, xKey;
+
+      if (this.isMobileDevice && this.touchControls) {
+        cursors = this.touchControls.getState();
+        wasd = this.touchControls.getWasdState();
+        spaceBar = this.touchControls.getSpaceState();
+        xKey = this.touchControls.getXKeyState();
+      } else {
+        cursors = this.cursors;
+        wasd = this.wasd;
+        spaceBar = this.spaceBar;
+        xKey = this.xKey;
+      }
+
+      this.dolphin.update(cursors, wasd, spaceBar, xKey);
       if (this.octopus && this.octopus.active) {
         this.octopus.update();
       }
