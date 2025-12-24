@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import Dolphin from '../entities/Dolphin.js';
 import ColombiaBall from '../entities/ColombiaBall.js';
+import RedTriangle from '../entities/RedTriangle.js';
 import Bullet from '../entities/Bullet.js';
 import IceBoss from '../entities/IceBoss.js';
 import Snowball from '../entities/Snowball.js';
@@ -35,15 +36,14 @@ export default class IceBossScene extends Phaser.Scene {
     this.soundGen = new SoundGenerator(this);
     this.soundGen.init();
 
-    // Fondo de hielo
-    this.cameras.main.setBackgroundColor('#B0E0E6');
+    // Crear fondo invernal mejorado
+    this.createWinterBackground();
 
-    // Crear efecto de nieve cayendo
+    // Crear efecto de nieve cayendo (mejorado)
     this.createSnowEffect();
 
-    // Suelo de hielo
-    this.ground = this.add.rectangle(400, 640, 800, 20, 0xADD8E6);
-    this.physics.add.existing(this.ground, true);
+    // Suelo de hielo con textura
+    this.createIceGround();
 
     // Plataformas de hielo
     this.platforms = [];
@@ -53,6 +53,9 @@ export default class IceBossScene extends Phaser.Scene {
     if (this.selectedCharacter === 'colombiaBall') {
       this.player = new ColombiaBall(this, 100, 550);
       this.dolphin = this.player; // Para compatibilidad
+    } else if (this.selectedCharacter === 'redTriangle') {
+      this.player = new RedTriangle(this, 100, 550);
+      this.dolphin = this.player;
     } else {
       this.player = new Dolphin(this, 100, 550, this.selectedBullets);
       this.dolphin = this.player;
@@ -100,6 +103,13 @@ export default class IceBossScene extends Phaser.Scene {
     this.events.on('colombiaAttack', this.handleColombiaAttack, this);
     this.events.on('colombiaEnergyBall', this.createEnergyBall, this);
 
+    // Eventos para Red Triangle
+    this.events.on('triangleJump', () => this.soundGen.play('jump'), this);
+    this.events.on('triangleDash', () => this.soundGen.play('dash'), this);
+    this.events.on('triangleShoot', () => this.soundGen.play('shootFire'), this);
+    this.events.on('triangleShield', () => this.soundGen.play('pickup'), this);
+    this.events.on('triangleFireball', this.createBigFireball, this);
+
     // Colisiones
     this.physics.add.overlap(this.iceBoss, this.bullets, this.hitIceBoss, null, this);
     this.physics.add.overlap(this.dolphin, this.snowballs, this.hitDolphinWithSnowball, null, this);
@@ -111,11 +121,15 @@ export default class IceBossScene extends Phaser.Scene {
       this.physics.add.collider(this.dolphin, platform);
     });
 
-    // Cambiar tipo de bala con Q
+    // Cambiar tipo de bala con Q (o activar escudo para RedTriangle)
     this.qKey.on('down', () => {
       if (!this.gameOver && !this.gameWon) {
-        this.dolphin.nextBulletType();
-        this.updateAmmoUI();
+        if (this.selectedCharacter === 'redTriangle') {
+          this.player.activateShield();
+        } else if (this.selectedCharacter !== 'colombiaBall') {
+          this.dolphin.nextBulletType();
+          this.updateAmmoUI();
+        }
       }
     });
 
@@ -144,51 +158,445 @@ export default class IceBossScene extends Phaser.Scene {
     this.time.delayedCall(5000, () => this.spawnAmmoRain());
   }
 
+  // Crear fondo invernal con montañas y cielo
+  createWinterBackground() {
+    // Degradado de cielo invernal
+    const skyGradient = this.add.graphics();
+    skyGradient.fillGradientStyle(0x1a237e, 0x1a237e, 0x4fc3f7, 0x4fc3f7, 1);
+    skyGradient.fillRect(0, 0, 800, 650);
+
+    // Montañas de fondo (lejanas - más claras)
+    const farMountains = this.add.graphics();
+    farMountains.fillStyle(0x90CAF9, 0.6);
+    farMountains.beginPath();
+    farMountains.moveTo(0, 450);
+    farMountains.lineTo(100, 280);
+    farMountains.lineTo(200, 380);
+    farMountains.lineTo(350, 200);
+    farMountains.lineTo(450, 350);
+    farMountains.lineTo(550, 180);
+    farMountains.lineTo(700, 320);
+    farMountains.lineTo(800, 250);
+    farMountains.lineTo(800, 450);
+    farMountains.closePath();
+    farMountains.fill();
+
+    // Montañas cercanas (más oscuras)
+    const nearMountains = this.add.graphics();
+    nearMountains.fillStyle(0x64B5F6, 0.8);
+    nearMountains.beginPath();
+    nearMountains.moveTo(0, 500);
+    nearMountains.lineTo(80, 380);
+    nearMountains.lineTo(180, 450);
+    nearMountains.lineTo(280, 320);
+    nearMountains.lineTo(400, 420);
+    nearMountains.lineTo(500, 300);
+    nearMountains.lineTo(620, 400);
+    nearMountains.lineTo(750, 350);
+    nearMountains.lineTo(800, 400);
+    nearMountains.lineTo(800, 500);
+    nearMountains.closePath();
+    nearMountains.fill();
+
+    // Nieve en las cumbres
+    const snowCaps = this.add.graphics();
+    snowCaps.fillStyle(0xFFFFFF, 0.9);
+    // Cumbre 1
+    snowCaps.fillTriangle(350, 200, 320, 240, 380, 240);
+    // Cumbre 2
+    snowCaps.fillTriangle(550, 180, 520, 220, 580, 220);
+    // Cumbre 3
+    snowCaps.fillTriangle(280, 320, 250, 355, 310, 355);
+
+    // Luna/sol invernal
+    const moon = this.add.circle(700, 80, 40, 0xFFFDE7, 0.8);
+    // Brillo alrededor
+    const moonGlow = this.add.circle(700, 80, 55, 0xFFFDE7, 0.2);
+
+    // Estrellas titilantes
+    this.stars = [];
+    for (let i = 0; i < 20; i++) {
+      const star = this.add.circle(
+        Phaser.Math.Between(50, 750),
+        Phaser.Math.Between(30, 200),
+        Phaser.Math.Between(1, 2),
+        0xFFFFFF,
+        Phaser.Math.FloatBetween(0.3, 0.8)
+      );
+      this.stars.push(star);
+
+      // Animación de titilación
+      this.tweens.add({
+        targets: star,
+        alpha: Phaser.Math.FloatBetween(0.2, 0.5),
+        duration: Phaser.Math.Between(500, 1500),
+        yoyo: true,
+        repeat: -1
+      });
+    }
+
+    // Aurora boreal sutil
+    const aurora = this.add.graphics();
+    aurora.fillStyle(0x00E676, 0.1);
+    aurora.fillRect(0, 50, 800, 100);
+    aurora.fillStyle(0x00BCD4, 0.08);
+    aurora.fillRect(0, 80, 800, 80);
+
+    this.tweens.add({
+      targets: aurora,
+      alpha: 0.3,
+      duration: 3000,
+      yoyo: true,
+      repeat: -1
+    });
+  }
+
+  // Suelo de hielo con textura
+  createIceGround() {
+    // Base del suelo
+    this.ground = this.add.rectangle(400, 635, 800, 30, 0x81D4FA);
+    this.physics.add.existing(this.ground, true);
+
+    // Textura de hielo en el suelo
+    const groundTexture = this.add.graphics();
+    groundTexture.fillStyle(0xB3E5FC, 0.5);
+    for (let x = 0; x < 800; x += 40) {
+      groundTexture.fillRect(x, 622, 35, 8);
+    }
+    groundTexture.fillStyle(0xE1F5FE, 0.6);
+    for (let x = 20; x < 800; x += 60) {
+      groundTexture.fillRect(x, 630, 25, 5);
+    }
+
+    // Montículos de nieve en el suelo
+    for (let i = 0; i < 5; i++) {
+      const x = 80 + i * 160;
+      const mound = this.add.ellipse(x, 620, 60, 20, 0xFFFFFF, 0.7);
+    }
+  }
+
   createSnowEffect() {
-    // Partículas de nieve simples
+    // Partículas de nieve mejoradas - más cantidad y variedad
     this.snowParticles = [];
-    for (let i = 0; i < 30; i++) {
+    for (let i = 0; i < 60; i++) {
+      const size = Phaser.Math.Between(2, 5);
       const snow = this.add.circle(
         Phaser.Math.Between(0, 800),
         Phaser.Math.Between(-50, 650),
-        Phaser.Math.Between(2, 4),
+        size,
         0xFFFFFF,
-        0.7
+        Phaser.Math.FloatBetween(0.4, 0.9)
       );
-      snow.speed = Phaser.Math.Between(30, 80);
-      snow.drift = Phaser.Math.FloatBetween(-0.5, 0.5);
+      snow.speed = Phaser.Math.Between(20, 100);
+      snow.drift = Phaser.Math.FloatBetween(-1, 1);
+      snow.wobble = Phaser.Math.FloatBetween(0, Math.PI * 2);
+      snow.wobbleSpeed = Phaser.Math.FloatBetween(0.02, 0.05);
       this.snowParticles.push(snow);
+    }
+
+    // Copos de nieve grandes ocasionales
+    this.bigSnowflakes = [];
+    for (let i = 0; i < 8; i++) {
+      const flake = this.add.star(
+        Phaser.Math.Between(0, 800),
+        Phaser.Math.Between(-100, 650),
+        6,
+        3,
+        6,
+        0xFFFFFF,
+        0.6
+      );
+      flake.speed = Phaser.Math.Between(15, 40);
+      flake.rotationSpeed = Phaser.Math.FloatBetween(-0.02, 0.02);
+      this.bigSnowflakes.push(flake);
     }
   }
 
   updateSnowEffect() {
+    // Actualizar nieve pequeña con movimiento ondulante
     this.snowParticles.forEach(snow => {
       snow.y += snow.speed * 0.016;
-      snow.x += snow.drift;
+      snow.wobble += snow.wobbleSpeed;
+      snow.x += snow.drift + Math.sin(snow.wobble) * 0.5;
 
-      if (snow.y > 650) {
+      if (snow.y > 620) {
         snow.y = -10;
         snow.x = Phaser.Math.Between(0, 800);
       }
       if (snow.x < 0) snow.x = 800;
       if (snow.x > 800) snow.x = 0;
     });
+
+    // Actualizar copos grandes con rotación
+    this.bigSnowflakes.forEach(flake => {
+      flake.y += flake.speed * 0.016;
+      flake.rotation += flake.rotationSpeed;
+
+      if (flake.y > 620) {
+        flake.y = -20;
+        flake.x = Phaser.Math.Between(0, 800);
+      }
+    });
+
+    // Actualizar plataformas móviles
+    this.updateMovingPlatforms();
   }
 
   createIcePlatforms() {
-    const positions = [
-      { x: 150, y: 520 },
-      { x: 400, y: 420 },
-      { x: 650, y: 520 },
-      { x: 280, y: 320 },
-      { x: 520, y: 220 },
+    // Plataformas estáticas con diferentes tamaños
+    const staticPlatforms = [
+      { x: 100, y: 540, width: 120, height: 18 },
+      { x: 700, y: 540, width: 120, height: 18 },
+      { x: 250, y: 440, width: 100, height: 15 },
+      { x: 550, y: 440, width: 100, height: 15 },
+      { x: 400, y: 340, width: 150, height: 18 },
+      { x: 150, y: 280, width: 80, height: 12 },
+      { x: 650, y: 280, width: 80, height: 12 },
+      { x: 400, y: 180, width: 120, height: 15 },
     ];
 
-    positions.forEach(pos => {
-      const platform = this.add.rectangle(pos.x, pos.y, 100, 15, 0x87CEEB);
-      this.physics.add.existing(platform, true);
-      this.platforms.push(platform);
+    staticPlatforms.forEach(pos => {
+      this.createIcePlatform(pos.x, pos.y, pos.width, pos.height, false);
     });
+
+    // Plataformas móviles
+    this.movingPlatforms = [];
+
+    // Plataforma móvil horizontal inferior
+    const movingPlatform1 = this.createIcePlatform(300, 500, 90, 14, true);
+    movingPlatform1.moveType = 'horizontal';
+    movingPlatform1.startX = 200;
+    movingPlatform1.endX = 400;
+    movingPlatform1.moveSpeed = 80;
+    movingPlatform1.direction = 1;
+    this.movingPlatforms.push(movingPlatform1);
+
+    // Plataforma móvil horizontal superior
+    const movingPlatform2 = this.createIcePlatform(500, 240, 90, 14, true);
+    movingPlatform2.moveType = 'horizontal';
+    movingPlatform2.startX = 450;
+    movingPlatform2.endX = 600;
+    movingPlatform2.moveSpeed = 60;
+    movingPlatform2.direction = -1;
+    this.movingPlatforms.push(movingPlatform2);
+
+    // Plataforma móvil vertical
+    const movingPlatform3 = this.createIcePlatform(50, 400, 70, 12, true);
+    movingPlatform3.moveType = 'vertical';
+    movingPlatform3.startY = 350;
+    movingPlatform3.endY = 520;
+    movingPlatform3.moveSpeed = 50;
+    movingPlatform3.direction = 1;
+    this.movingPlatforms.push(movingPlatform3);
+
+    // Plataforma móvil vertical derecha
+    const movingPlatform4 = this.createIcePlatform(750, 380, 70, 12, true);
+    movingPlatform4.moveType = 'vertical';
+    movingPlatform4.startY = 300;
+    movingPlatform4.endY = 480;
+    movingPlatform4.moveSpeed = 40;
+    movingPlatform4.direction = -1;
+    this.movingPlatforms.push(movingPlatform4);
+
+    // Decoraciones de hielo
+    this.createIceDecorations();
+  }
+
+  createIcePlatform(x, y, width, height, isMoving) {
+    // Contenedor para la plataforma
+    const container = this.add.container(x, y);
+
+    // Plataforma principal - gradiente de hielo
+    const platform = this.add.rectangle(0, 0, width, height, 0x81D4FA);
+    platform.setStrokeStyle(2, 0x4FC3F7);
+    container.add(platform);
+
+    // Brillo superior
+    const highlight = this.add.rectangle(0, -height/4, width - 4, height/3, 0xE1F5FE, 0.6);
+    container.add(highlight);
+
+    // Carámbanos debajo de la plataforma
+    const icicleCount = Math.floor(width / 20);
+    for (let i = 0; i < icicleCount; i++) {
+      const icicleX = -width/2 + 15 + i * 20;
+      const icicleHeight = Phaser.Math.Between(8, 20);
+      const icicle = this.add.triangle(
+        icicleX, height/2 + icicleHeight/2,
+        0, 0,
+        6, 0,
+        3, icicleHeight,
+        0xB3E5FC
+      );
+      icicle.setAlpha(0.8);
+      container.add(icicle);
+    }
+
+    // Física
+    const physicsRect = this.add.rectangle(x, y, width, height);
+    physicsRect.setVisible(false);
+    this.physics.add.existing(physicsRect, true);
+    this.platforms.push(physicsRect);
+
+    // Indicador de plataforma móvil
+    if (isMoving) {
+      platform.setFillStyle(0x4DD0E1);
+      platform.setStrokeStyle(2, 0x00BCD4);
+
+      // Efecto de brillo para plataformas móviles
+      this.tweens.add({
+        targets: platform,
+        alpha: 0.7,
+        duration: 800,
+        yoyo: true,
+        repeat: -1
+      });
+
+      physicsRect.container = container;
+    }
+
+    return physicsRect;
+  }
+
+  updateMovingPlatforms() {
+    this.movingPlatforms.forEach(platform => {
+      if (platform.moveType === 'horizontal') {
+        platform.x += platform.moveSpeed * platform.direction * 0.016;
+
+        if (platform.x >= platform.endX) {
+          platform.direction = -1;
+        } else if (platform.x <= platform.startX) {
+          platform.direction = 1;
+        }
+
+        if (platform.container) {
+          platform.container.x = platform.x;
+        }
+        platform.body.reset(platform.x, platform.y);
+
+      } else if (platform.moveType === 'vertical') {
+        platform.y += platform.moveSpeed * platform.direction * 0.016;
+
+        if (platform.y >= platform.endY) {
+          platform.direction = -1;
+        } else if (platform.y <= platform.startY) {
+          platform.direction = 1;
+        }
+
+        if (platform.container) {
+          platform.container.y = platform.y;
+        }
+        platform.body.reset(platform.x, platform.y);
+      }
+    });
+  }
+
+  createIceDecorations() {
+    // Cristales de hielo grandes en los bordes
+    this.createIceCrystal(30, 580, 1);
+    this.createIceCrystal(770, 580, -1);
+    this.createIceCrystal(200, 600, 0.7);
+    this.createIceCrystal(600, 600, 0.7);
+
+    // Estalactitas en la parte superior
+    const stalactitePositions = [50, 150, 300, 500, 650, 750];
+    stalactitePositions.forEach(x => {
+      this.createStalactite(x);
+    });
+
+    // Partículas de hielo flotantes (usando polygon para forma de diamante)
+    this.iceParticles = [];
+    for (let i = 0; i < 10; i++) {
+      const x = Phaser.Math.Between(50, 750);
+      const y = Phaser.Math.Between(100, 500);
+      // Crear diamante con polygon: arriba, derecha, abajo, izquierda
+      const particle = this.add.polygon(x, y, [
+        0, -5,   // arriba
+        3, 0,    // derecha
+        0, 5,    // abajo
+        -3, 0    // izquierda
+      ], 0xB3E5FC, 0.4);
+
+      this.tweens.add({
+        targets: particle,
+        y: y - 20,
+        alpha: 0.2,
+        duration: Phaser.Math.Between(2000, 4000),
+        yoyo: true,
+        repeat: -1
+      });
+
+      this.iceParticles.push(particle);
+    }
+  }
+
+  createIceCrystal(x, y, scale) {
+    const crystal = this.add.container(x, y);
+
+    // Cristal principal
+    const main = this.add.polygon(0, 0, [
+      0, -40 * Math.abs(scale),
+      15 * scale, -10,
+      10 * scale, 30,
+      -10 * scale, 30,
+      -15 * scale, -10
+    ], 0x4FC3F7, 0.7);
+    crystal.add(main);
+
+    // Brillo interno
+    const shine = this.add.polygon(0, -5, [
+      0, -25 * Math.abs(scale),
+      8 * scale, -5,
+      5 * scale, 15,
+      -5 * scale, 15,
+      -8 * scale, -5
+    ], 0xE1F5FE, 0.5);
+    crystal.add(shine);
+
+    // Destello
+    const sparkle = this.add.circle(5 * scale, -20 * Math.abs(scale), 3, 0xFFFFFF, 0.8);
+    crystal.add(sparkle);
+
+    this.tweens.add({
+      targets: sparkle,
+      alpha: 0.2,
+      duration: 500,
+      yoyo: true,
+      repeat: -1
+    });
+  }
+
+  createStalactite(x) {
+    const height = Phaser.Math.Between(30, 60);
+    const width = Phaser.Math.Between(10, 20);
+
+    const stalactite = this.add.triangle(
+      x, height/2,
+      0, 0,
+      width, 0,
+      width/2, height,
+      0x81D4FA,
+      0.8
+    );
+    stalactite.setStrokeStyle(1, 0xB3E5FC);
+
+    // Gota de agua ocasional
+    if (Phaser.Math.Between(0, 1) === 1) {
+      this.time.addEvent({
+        delay: Phaser.Math.Between(3000, 8000),
+        callback: () => {
+          if (this.gameOver || this.gameWon) return;
+          const drop = this.add.circle(x, height + 5, 3, 0x4FC3F7, 0.8);
+          this.tweens.add({
+            targets: drop,
+            y: 620,
+            alpha: 0,
+            duration: 1500,
+            onComplete: () => drop.destroy()
+          });
+        },
+        loop: true
+      });
+    }
   }
 
   createUI() {
@@ -197,9 +605,10 @@ export default class IceBossScene extends Phaser.Scene {
 
     // Vida del personaje
     const maxHealth = this.selectedCharacter === 'colombiaBall' ? 4 : 3;
+    const healthColor = this.selectedCharacter === 'redTriangle' ? '#FF0000' : '#006400';
     this.dolphinHealthText = this.add.text(10, 10, `Vida: ${maxHealth}/${maxHealth}`, {
       fontSize: fontSize,
-      fill: '#006400',
+      fill: healthColor,
       fontFamily: 'Courier New',
       backgroundColor: '#ffffffaa',
       padding: { x: 5, y: 2 }
@@ -210,6 +619,14 @@ export default class IceBossScene extends Phaser.Scene {
       this.ammoText = this.add.text(10, 35, 'Combo: 0/3 → Bola de energía', {
         fontSize: smallFontSize,
         fill: '#9400D3',
+        fontFamily: 'Courier New',
+        backgroundColor: '#000000aa',
+        padding: { x: 5, y: 2 }
+      });
+    } else if (this.selectedCharacter === 'redTriangle') {
+      this.ammoText = this.add.text(10, 35, 'Fuego: ∞ | Q: Escudo', {
+        fontSize: smallFontSize,
+        fill: '#FF4500',
         fontFamily: 'Courier New',
         backgroundColor: '#000000aa',
         padding: { x: 5, y: 2 }
@@ -494,7 +911,8 @@ export default class IceBossScene extends Phaser.Scene {
     // Efecto de congelación
     const iceBlock = this.add.rectangle(this.dolphin.x, this.dolphin.y, 50, 50, 0x87CEEB, 0.5);
 
-    this.time.delayedCall(1500, () => {
+    // Tiempo de congelación reducido (800ms en vez de 1500ms)
+    this.time.delayedCall(800, () => {
       if (this.dolphin && this.dolphin.active) {
         this.dolphin.isFrozen = false;
         this.dolphin.speed = savedSpeed;
@@ -648,14 +1066,15 @@ export default class IceBossScene extends Phaser.Scene {
   collectPowerup(dolphin, powerup) {
     if (!powerup.active) return;
 
-    // Colombia Ball no usa munición, los powerups le dan vida
-    if (this.selectedCharacter === 'colombiaBall') {
+    // Colombia Ball y RedTriangle no usan munición, los powerups les dan vida
+    if (this.selectedCharacter === 'colombiaBall' || this.selectedCharacter === 'redTriangle') {
       if (dolphin.health < dolphin.maxHealth) {
         dolphin.health++;
         this.soundGen.play('pickup');
         const maxHealth = dolphin.maxHealth;
+        const healthColor = this.selectedCharacter === 'redTriangle' ? '#FF0000' : '#006400';
         this.dolphinHealthText.setText(`Vida: ${dolphin.health}/${maxHealth}`);
-        this.dolphinHealthText.setFill('#006400');
+        this.dolphinHealthText.setFill(healthColor);
 
         // Efecto visual de curación
         const healText = this.add.text(powerup.x, powerup.y, '+1 ❤️', {
@@ -731,6 +1150,58 @@ export default class IceBossScene extends Phaser.Scene {
       if (this.healthText && this.iceBoss.active) {
         this.healthText.setText(`Ice Boss: ${this.iceBoss.health}`);
       }
+    }
+  }
+
+  // Crear bola de fuego grande de Red Triangle
+  createBigFireball(x, y, flipX) {
+    if (!this.iceBoss || !this.iceBoss.active) return;
+
+    const bullet = this.bullets.get(x, y, 'bigFireball');
+    if (bullet) {
+      bullet.setActive(true);
+      bullet.setVisible(true);
+      bullet.body.reset(x, y);
+
+      const direction = flipX ? -1 : 1;
+      bullet.setVelocityX(380 * direction);
+      bullet.damage = 10; // Muy efectivo contra hielo
+      bullet.bulletType = 'bigFireball';
+      bullet.setScale(1.5);
+
+      this.soundGen.play('shootFire');
+
+      // Efecto de brillo de fuego
+      this.tweens.add({
+        targets: bullet,
+        alpha: 0.7,
+        scaleX: 1.7,
+        scaleY: 1.3,
+        duration: 150,
+        yoyo: true,
+        repeat: -1
+      });
+
+      // Trail de fuego
+      const trail = this.time.addEvent({
+        delay: 40,
+        callback: () => {
+          if (!bullet.active) {
+            trail.remove();
+            return;
+          }
+          const trailParticle = this.add.circle(bullet.x, bullet.y, 12, 0xFF4500, 0.6);
+          this.tweens.add({
+            targets: trailParticle,
+            scale: 0,
+            alpha: 0,
+            y: bullet.y + Phaser.Math.Between(-10, 10),
+            duration: 250,
+            onComplete: () => trailParticle.destroy()
+          });
+        },
+        loop: true
+      });
     }
   }
 

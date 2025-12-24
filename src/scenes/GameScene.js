@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import Dolphin from '../entities/Dolphin.js';
 import ColombiaBall from '../entities/ColombiaBall.js';
+import RedTriangle from '../entities/RedTriangle.js';
 import Bullet from '../entities/Bullet.js';
 import Octopus from '../entities/Octopus.js';
 import OctopusBullet from '../entities/OctopusBullet.js';
@@ -49,6 +50,9 @@ export default class GameScene extends Phaser.Scene {
     if (this.selectedCharacter === 'colombiaBall') {
       this.player = new ColombiaBall(this, 100, 550);
       this.dolphin = this.player; // Para compatibilidad con código existente
+    } else if (this.selectedCharacter === 'redTriangle') {
+      this.player = new RedTriangle(this, 100, 550);
+      this.dolphin = this.player;
     } else {
       this.player = new Dolphin(this, 100, 550, this.selectedBullets);
       this.dolphin = this.player;
@@ -94,6 +98,13 @@ export default class GameScene extends Phaser.Scene {
     this.events.on('colombiaAttack', this.handleColombiaAttack, this);
     this.events.on('colombiaEnergyBall', this.createEnergyBall, this);
 
+    // Eventos para Red Triangle
+    this.events.on('triangleJump', () => this.soundGen.play('jump'), this);
+    this.events.on('triangleDash', () => this.soundGen.play('dash'), this);
+    this.events.on('triangleShoot', () => this.soundGen.play('shootFire'), this);
+    this.events.on('triangleShield', () => this.soundGen.play('pickup'), this);
+    this.events.on('triangleFireball', this.createBigFireball, this);
+
     // Colisiones
     this.physics.add.overlap(
       this.octopus,
@@ -125,12 +136,17 @@ export default class GameScene extends Phaser.Scene {
     // UI
     this.createUI();
 
-    // Tecla Q para cambiar tipo de bala
+    // Tecla Q para cambiar tipo de bala o activar escudo
     this.qKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.Q);
     this.qKey.on('down', () => {
       if (!this.gameOver && !this.gameWon) {
-        this.dolphin.nextBulletType();
-        this.updateAmmoUI();
+        if (this.selectedCharacter === 'redTriangle') {
+          // Activar escudo de tarjetas
+          this.dolphin.activateShield();
+        } else if (this.selectedCharacter !== 'colombiaBall') {
+          this.dolphin.nextBulletType();
+          this.updateAmmoUI();
+        }
       }
     });
 
@@ -192,8 +208,10 @@ export default class GameScene extends Phaser.Scene {
     const smallFontSize = this.isMobileDevice ? '12px' : '16px';
 
     // Vida del personaje
-    const maxHealth = this.selectedCharacter === 'colombiaBall' ? 4 : 3;
-    const charName = this.selectedCharacter === 'colombiaBall' ? 'Colombia' : 'Mielito';
+    let maxHealth = 3;
+    if (this.selectedCharacter === 'colombiaBall') maxHealth = 4;
+    else if (this.selectedCharacter === 'redTriangle') maxHealth = 3;
+
     this.dolphinHealthText = this.add.text(10, 10, `Vida: ${maxHealth}/${maxHealth}`, {
       fontSize: fontSize,
       fill: '#006400',
@@ -202,11 +220,19 @@ export default class GameScene extends Phaser.Scene {
       padding: { x: 5, y: 2 }
     });
 
-    // Munición o Combo (según personaje)
+    // Munición o info según personaje
     if (this.selectedCharacter === 'colombiaBall') {
       this.ammoText = this.add.text(10, 35, 'Combo: 0/3 → Bola de energía', {
         fontSize: smallFontSize,
         fill: '#9400D3',
+        fontFamily: 'Courier New',
+        backgroundColor: '#000000aa',
+        padding: { x: 5, y: 2 }
+      });
+    } else if (this.selectedCharacter === 'redTriangle') {
+      this.ammoText = this.add.text(10, 35, 'Bola de fuego + Escudo (Q)', {
+        fontSize: smallFontSize,
+        fill: '#FF4500',
         fontFamily: 'Courier New',
         backgroundColor: '#000000aa',
         padding: { x: 5, y: 2 }
@@ -845,8 +871,8 @@ export default class GameScene extends Phaser.Scene {
   collectPowerup(dolphin, powerup) {
     if (!powerup.active) return;
 
-    // Colombia Ball no usa munición, los powerups le dan vida
-    if (this.selectedCharacter === 'colombiaBall') {
+    // Colombia Ball y Red Triangle no usan munición, los powerups le dan vida
+    if (this.selectedCharacter === 'colombiaBall' || this.selectedCharacter === 'redTriangle') {
       if (dolphin.health < dolphin.maxHealth) {
         dolphin.health++;
         this.soundGen.play('pickup');
@@ -1093,6 +1119,61 @@ export default class GameScene extends Phaser.Scene {
             scale: 0,
             alpha: 0,
             duration: 200,
+            onComplete: () => trailParticle.destroy()
+          });
+        },
+        loop: true
+      });
+    }
+  }
+
+  // Crear bola de fuego grande de Red Triangle
+  createBigFireball(x, y, flipX) {
+    if (!this.octopus || !this.octopus.active) return;
+
+    const bullet = this.bullets.get(x, y, 'bigFireball');
+    if (bullet) {
+      bullet.setActive(true);
+      bullet.setVisible(true);
+      bullet.body.reset(x, y);
+
+      const direction = flipX ? -1 : 1;
+      bullet.setVelocityX(350 * direction);
+      bullet.damage = 8; // Más daño que otras balas
+      bullet.bulletType = 'bigFireball';
+      bullet.setScale(1.3);
+
+      // Efecto de fuego pulsante
+      this.tweens.add({
+        targets: bullet,
+        scale: 1.5,
+        duration: 150,
+        yoyo: true,
+        repeat: -1
+      });
+
+      // Trail de fuego
+      const trail = this.time.addEvent({
+        delay: 40,
+        callback: () => {
+          if (!bullet.active) {
+            trail.remove();
+            return;
+          }
+          const colors = [0xFF4500, 0xFFD700, 0xFF0000];
+          const color = Phaser.Math.RND.pick(colors);
+          const trailParticle = this.add.circle(
+            bullet.x + Phaser.Math.Between(-5, 5),
+            bullet.y + Phaser.Math.Between(-5, 5),
+            Phaser.Math.Between(5, 12),
+            color,
+            0.7
+          );
+          this.tweens.add({
+            targets: trailParticle,
+            scale: 0,
+            alpha: 0,
+            duration: 300,
             onComplete: () => trailParticle.destroy()
           });
         },

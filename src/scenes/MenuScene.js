@@ -131,11 +131,11 @@ export default class MenuScene extends Phaser.Scene {
     });
 
     // Posiciones adaptadas para móvil
-    const charSelectY = this.isMobileDevice ? 400 : 470;
-    const bossSelectY = this.isMobileDevice ? 455 : 525;
-    const selectionY = this.isMobileDevice ? 510 : 575;
-    const playBtnY = this.isMobileDevice ? 550 : 610;
-    const controlsY = this.isMobileDevice ? 600 : 645;
+    const charSelectY = this.isMobileDevice ? 390 : 460;
+    const bossSelectY = this.isMobileDevice ? 450 : 520;
+    const selectionY = this.isMobileDevice ? 505 : 570;
+    const playBtnY = this.isMobileDevice ? 545 : 605;
+    const controlsY = this.isMobileDevice ? 595 : 640;
 
     // Selector de Personaje
     const charText = this.add.text(400, charSelectY - 20, 'Elige tu personaje:', {
@@ -145,14 +145,14 @@ export default class MenuScene extends Phaser.Scene {
     });
     charText.setOrigin(0.5);
 
-    const charBtnWidth = this.isMobileDevice ? 140 : 170;
+    const charBtnWidth = this.isMobileDevice ? 95 : 120;
     // Botón Mielito (Delfín)
-    this.char1Btn = this.add.rectangle(300, charSelectY, charBtnWidth, 30, 0x225522);
+    this.char1Btn = this.add.rectangle(200, charSelectY, charBtnWidth, 28, 0x225522);
     this.char1Btn.setStrokeStyle(2, 0x44aa44);
     this.char1Btn.setInteractive({ useHandCursor: true });
 
-    this.char1Text = this.add.text(300, charSelectY, 'Mielito', {
-      fontSize: this.isMobileDevice ? '10px' : '12px',
+    this.char1Text = this.add.text(200, charSelectY, 'Mielito', {
+      fontSize: this.isMobileDevice ? '9px' : '11px',
       fill: '#1E90FF',
       fontFamily: 'Courier New',
       fontStyle: 'bold'
@@ -160,21 +160,35 @@ export default class MenuScene extends Phaser.Scene {
     this.char1Text.setOrigin(0.5);
 
     // Botón Colombia Ball
-    this.char2Btn = this.add.rectangle(500, charSelectY, charBtnWidth, 30, 0x333355);
+    this.char2Btn = this.add.rectangle(400, charSelectY, charBtnWidth, 28, 0x333355);
     this.char2Btn.setStrokeStyle(2, 0x555577);
     this.char2Btn.setInteractive({ useHandCursor: true });
 
-    this.char2Text = this.add.text(500, charSelectY, 'Colombia Ball', {
-      fontSize: this.isMobileDevice ? '10px' : '12px',
+    this.char2Text = this.add.text(400, charSelectY, 'Colombia', {
+      fontSize: this.isMobileDevice ? '9px' : '11px',
       fill: '#FCD116',
       fontFamily: 'Courier New',
       fontStyle: 'bold'
     });
     this.char2Text.setOrigin(0.5);
 
+    // Botón Red Triangle
+    this.char3Btn = this.add.rectangle(600, charSelectY, charBtnWidth, 28, 0x333355);
+    this.char3Btn.setStrokeStyle(2, 0x555577);
+    this.char3Btn.setInteractive({ useHandCursor: true });
+
+    this.char3Text = this.add.text(600, charSelectY, 'Triángulo', {
+      fontSize: this.isMobileDevice ? '9px' : '11px',
+      fill: '#FF0000',
+      fontFamily: 'Courier New',
+      fontStyle: 'bold'
+    });
+    this.char3Text.setOrigin(0.5);
+
     // Eventos de selección de personaje
     this.char1Btn.on('pointerdown', () => this.selectCharacter('dolphin'));
     this.char2Btn.on('pointerdown', () => this.selectCharacter('colombiaBall'));
+    this.char3Btn.on('pointerdown', () => this.selectCharacter('redTriangle'));
 
     this.char1Btn.on('pointerover', () => {
       if (this.selectedCharacter !== 'dolphin') this.char1Btn.setFillStyle(0x334433);
@@ -187,6 +201,12 @@ export default class MenuScene extends Phaser.Scene {
     });
     this.char2Btn.on('pointerout', () => {
       if (this.selectedCharacter !== 'colombiaBall') this.char2Btn.setFillStyle(0x333355);
+    });
+    this.char3Btn.on('pointerover', () => {
+      if (this.selectedCharacter !== 'redTriangle') this.char3Btn.setFillStyle(0x442222);
+    });
+    this.char3Btn.on('pointerout', () => {
+      if (this.selectedCharacter !== 'redTriangle') this.char3Btn.setFillStyle(0x333355);
     });
 
     // Selector de Boss
@@ -343,16 +363,24 @@ export default class MenuScene extends Phaser.Scene {
   selectCharacter(charType) {
     this.selectedCharacter = charType;
 
+    // Reset todos los botones
+    this.char1Btn.setFillStyle(0x333355);
+    this.char1Btn.setStrokeStyle(2, 0x555577);
+    this.char2Btn.setFillStyle(0x333355);
+    this.char2Btn.setStrokeStyle(2, 0x555577);
+    this.char3Btn.setFillStyle(0x333355);
+    this.char3Btn.setStrokeStyle(2, 0x555577);
+
+    // Activar el seleccionado
     if (charType === 'dolphin') {
       this.char1Btn.setFillStyle(0x225522);
       this.char1Btn.setStrokeStyle(2, 0x44aa44);
-      this.char2Btn.setFillStyle(0x333355);
-      this.char2Btn.setStrokeStyle(2, 0x555577);
-    } else {
-      this.char1Btn.setFillStyle(0x333355);
-      this.char1Btn.setStrokeStyle(2, 0x555577);
+    } else if (charType === 'colombiaBall') {
       this.char2Btn.setFillStyle(0x443322);
       this.char2Btn.setStrokeStyle(2, 0xaa8844);
+    } else if (charType === 'redTriangle') {
+      this.char3Btn.setFillStyle(0x552222);
+      this.char3Btn.setStrokeStyle(2, 0xaa4444);
     }
   }
 

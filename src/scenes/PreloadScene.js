@@ -364,6 +364,88 @@ export default class PreloadScene extends Phaser.Scene {
     energyBallGraphics.fillCircle(8, 8, 3);
     energyBallGraphics.generateTexture('energyBall', 24, 24);
     energyBallGraphics.destroy();
+
+    // Red Triangle - Triángulo rojo con ojos
+    const triangleGraphics = this.add.graphics();
+    // Triángulo principal rojo
+    triangleGraphics.fillStyle(0xFF0000, 1);
+    triangleGraphics.fillTriangle(25, 5, 5, 45, 45, 45);
+    // Borde más oscuro
+    triangleGraphics.lineStyle(3, 0x8B0000, 1);
+    triangleGraphics.strokeTriangle(25, 5, 5, 45, 45, 45);
+    // Ojos blancos
+    triangleGraphics.fillStyle(0xFFFFFF, 1);
+    triangleGraphics.fillCircle(18, 28, 6);
+    triangleGraphics.fillCircle(32, 28, 6);
+    // Pupilas negras
+    triangleGraphics.fillStyle(0x000000, 1);
+    triangleGraphics.fillCircle(19, 28, 3);
+    triangleGraphics.fillCircle(33, 28, 3);
+    triangleGraphics.generateTexture('redTriangle', 50, 50);
+    triangleGraphics.destroy();
+
+    // Red Triangle saltando
+    const triangleJumpGraphics = this.add.graphics();
+    triangleJumpGraphics.fillStyle(0xFF0000, 1);
+    triangleJumpGraphics.fillTriangle(25, 5, 5, 45, 45, 45);
+    triangleJumpGraphics.lineStyle(3, 0x8B0000, 1);
+    triangleJumpGraphics.strokeTriangle(25, 5, 5, 45, 45, 45);
+    // Ojos mirando arriba
+    triangleJumpGraphics.fillStyle(0xFFFFFF, 1);
+    triangleJumpGraphics.fillCircle(18, 25, 6);
+    triangleJumpGraphics.fillCircle(32, 25, 6);
+    triangleJumpGraphics.fillStyle(0x000000, 1);
+    triangleJumpGraphics.fillCircle(18, 22, 3);
+    triangleJumpGraphics.fillCircle(32, 22, 3);
+    triangleJumpGraphics.generateTexture('redTriangle_jump', 50, 50);
+    triangleJumpGraphics.destroy();
+
+    // Red Triangle con escudo (tarjetas)
+    const triangleShieldGraphics = this.add.graphics();
+    triangleShieldGraphics.fillStyle(0xFF4500, 1); // Naranja cuando escudo activo
+    triangleShieldGraphics.fillTriangle(25, 5, 5, 45, 45, 45);
+    triangleShieldGraphics.lineStyle(3, 0xFFD700, 1); // Borde dorado
+    triangleShieldGraphics.strokeTriangle(25, 5, 5, 45, 45, 45);
+    // Ojos determinados
+    triangleShieldGraphics.fillStyle(0xFFFFFF, 1);
+    triangleShieldGraphics.fillCircle(18, 28, 6);
+    triangleShieldGraphics.fillCircle(32, 28, 6);
+    triangleShieldGraphics.fillStyle(0xFFD700, 1); // Pupilas doradas
+    triangleShieldGraphics.fillCircle(19, 28, 4);
+    triangleShieldGraphics.fillCircle(33, 28, 4);
+    triangleShieldGraphics.generateTexture('redTriangle_shield', 50, 50);
+    triangleShieldGraphics.destroy();
+
+    // Bola de fuego grande (ataque del triángulo)
+    const bigFireballGraphics = this.add.graphics();
+    // Núcleo naranja/rojo
+    bigFireballGraphics.fillStyle(0xFF4500, 1);
+    bigFireballGraphics.fillCircle(18, 18, 18);
+    // Centro amarillo
+    bigFireballGraphics.fillStyle(0xFFD700, 1);
+    bigFireballGraphics.fillCircle(16, 16, 12);
+    // Brillo blanco
+    bigFireballGraphics.fillStyle(0xFFFFFF, 1);
+    bigFireballGraphics.fillCircle(12, 12, 5);
+    // Llamas externas
+    bigFireballGraphics.fillStyle(0xFF0000, 0.7);
+    bigFireballGraphics.fillCircle(30, 18, 8);
+    bigFireballGraphics.fillCircle(18, 30, 6);
+    bigFireballGraphics.generateTexture('bigFireball', 36, 36);
+    bigFireballGraphics.destroy();
+
+    // Tarjeta bloqueadora
+    const cardGraphics = this.add.graphics();
+    cardGraphics.fillStyle(0xFFD700, 1);
+    cardGraphics.fillRect(0, 0, 20, 30);
+    cardGraphics.lineStyle(2, 0xFF8C00, 1);
+    cardGraphics.strokeRect(0, 0, 20, 30);
+    // Símbolo de rombo en la tarjeta (en lugar de estrella)
+    cardGraphics.fillStyle(0xFF4500, 1);
+    cardGraphics.fillTriangle(10, 8, 6, 15, 14, 15); // Triángulo arriba
+    cardGraphics.fillTriangle(10, 22, 6, 15, 14, 15); // Triángulo abajo
+    cardGraphics.generateTexture('blockCard', 20, 30);
+    cardGraphics.destroy();
   }
 
   create() {
