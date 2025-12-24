@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import PreloadScene from './scenes/PreloadScene.js';
 import MenuScene from './scenes/MenuScene.js';
 import GameScene from './scenes/GameScene.js';
+import IceBossScene from './scenes/IceBossScene.js';
 
 // Detectar si es dispositivo móvil o tablet
 // iPad con Safari moderno reporta como MacOS, hay que detectarlo por touch + plataforma
@@ -40,5 +41,5 @@ export const config = {
   input: {
     activePointers: 3 // Permitir múltiples toques simultáneos
   },
-  scene: [PreloadScene, MenuScene, GameScene]
+  scene: [PreloadScene, MenuScene, GameScene, IceBossScene]
 };

@@ -39,7 +39,8 @@ export default class Dolphin extends Phaser.Physics.Arcade.Sprite {
       ice: 15,
       triple: 10,
       fast: 15,
-      teleport: 5
+      teleport: 5,
+      xmas: 8
     };
 
     selectedBullets.forEach(type => {
@@ -61,12 +62,12 @@ export default class Dolphin extends Phaser.Physics.Arcade.Sprite {
       ice: { cooldown: 10000, canShoot: true } // 10 segundos para hielo
     };
 
-    // Dash
+    // Dash - mejorado: más rápido, más lejos, direccional
     this.canDash = true;
     this.isDashing = false;
-    this.dashSpeed = 600;
-    this.dashDuration = 150; // ms
-    this.dashCooldown = 800; // ms entre dashes
+    this.dashSpeed = 900; // Más rápido (era 600)
+    this.dashDuration = 200; // Más duración = más lejos (era 150)
+    this.dashCooldown = 600; // Cooldown más corto (era 800)
   }
 
   update(cursors, wasd, spaceBar, xKey) {
@@ -94,9 +95,23 @@ export default class Dolphin extends Phaser.Physics.Arcade.Sprite {
       this.scene.events.emit('dolphinJump');
     }
 
-    // Dash con X
+    // Dash con X - direccional según WASD
     if (xKey && xKey.isDown && this.canDash) {
-      this.performDash();
+      // Determinar dirección del dash
+      let dashDirX = 0;
+      let dashDirY = 0;
+
+      if (wasd.w.isDown || cursors.up.isDown) dashDirY = -1;
+      if (wasd.s.isDown || cursors.down.isDown) dashDirY = 1;
+      if (wasd.a.isDown || cursors.left.isDown) dashDirX = -1;
+      if (wasd.d.isDown || cursors.right.isDown) dashDirX = 1;
+
+      // Si no hay dirección, usar la dirección donde mira
+      if (dashDirX === 0 && dashDirY === 0) {
+        dashDirX = this.flipX ? -1 : 1;
+      }
+
+      this.performDash(dashDirX, dashDirY);
     }
 
     // Si aterrizó (velocidad Y es casi 0 y está tocando suelo)
@@ -216,21 +231,36 @@ export default class Dolphin extends Phaser.Physics.Arcade.Sprite {
     return this.bulletType;
   }
 
-  // Realizar dash
-  performDash() {
+  // Realizar dash - direccional (X+W=arriba, X+S=abajo, X+A=izq, X+D=der)
+  performDash(dirX = 1, dirY = 0) {
     this.canDash = false;
     this.isDashing = true;
 
-    // Dirección del dash (hacia donde mira)
-    const direction = this.flipX ? -1 : 1;
+    // Normalizar dirección si es diagonal
+    const magnitude = Math.sqrt(dirX * dirX + dirY * dirY);
+    const normX = dirX / magnitude;
+    const normY = dirY / magnitude;
 
-    // Aplicar velocidad de dash
-    this.setVelocityX(this.dashSpeed * direction);
-    this.setVelocityY(0); // Sin velocidad vertical durante dash
+    // Aplicar velocidad de dash en la dirección indicada
+    this.setVelocityX(this.dashSpeed * normX);
+    this.setVelocityY(this.dashSpeed * normY);
 
-    // Efecto visual
+    // Voltear sprite según dirección horizontal
+    if (dirX !== 0) {
+      this.setFlipX(dirX < 0);
+    }
+
+    // Si hay dash vertical, marcar como en el aire
+    if (dirY !== 0) {
+      this.isInAir = true;
+    }
+
+    // Efecto visual mejorado
     this.setTint(0x00FFFF);
-    this.alpha = 0.7;
+    this.alpha = 0.6;
+
+    // Crear efecto de estela
+    this.createDashTrail();
 
     // Emitir evento de sonido
     this.scene.events.emit('dolphinDash');
@@ -240,13 +270,38 @@ export default class Dolphin extends Phaser.Physics.Arcade.Sprite {
       this.isDashing = false;
       this.clearTint();
       this.alpha = 1;
-      this.setVelocityX(0);
+      // Solo detener velocidad horizontal si no estaba en dirección vertical
+      if (dirY === 0) {
+        this.setVelocityX(0);
+      }
     });
 
     // Cooldown del dash
     this.scene.time.delayedCall(this.dashCooldown, () => {
       this.canDash = true;
     });
+  }
+
+  // Crear efecto de estela durante el dash
+  createDashTrail() {
+    // Crear 3 copias fantasma que desaparecen
+    for (let i = 0; i < 3; i++) {
+      this.scene.time.delayedCall(i * 40, () => {
+        if (!this.scene) return;
+        const ghost = this.scene.add.sprite(this.x, this.y, this.texture.key);
+        ghost.setScale(this.scaleX, this.scaleY);
+        ghost.setFlipX(this.flipX);
+        ghost.setTint(0x00FFFF);
+        ghost.setAlpha(0.5 - i * 0.15);
+
+        this.scene.tweens.add({
+          targets: ghost,
+          alpha: 0,
+          duration: 150,
+          onComplete: () => ghost.destroy()
+        });
+      });
+    }
   }
 
   takeDamage() {
