@@ -8,6 +8,11 @@ export default class MenuScene extends Phaser.Scene {
     this.selectedBoss = 'octopus'; // 'octopus' o 'iceBoss'
     this.selectedCharacter = 'dolphin'; // 'dolphin' o 'colombiaBall'
     this.isMobileDevice = isMobile;
+
+    // PvP mode state
+    this.pvpMode = false;
+    this.pvpPlayerCharacter = null;
+    this.pvpOpponentCharacter = null;
   }
 
   create() {
@@ -299,6 +304,35 @@ export default class MenuScene extends Phaser.Scene {
       });
       mobileHint.setOrigin(0.5);
     }
+
+    // Botón Modo PvP
+    const pvpBtnY = this.isMobileDevice ? 555 : 590;
+    const pvpBtnWidth = this.isMobileDevice ? 160 : 200;
+    const pvpBtnHeight = this.isMobileDevice ? 40 : 45;
+
+    this.pvpButton = this.add.rectangle(400, pvpBtnY, pvpBtnWidth, pvpBtnHeight, 0x663399);
+    this.pvpButton.setStrokeStyle(2, 0x9944CC);
+    this.pvpButton.setInteractive({ useHandCursor: true });
+
+    this.pvpButtonText = this.add.text(400, pvpBtnY, 'MODO PvP', {
+      fontSize: this.isMobileDevice ? '18px' : '22px',
+      fill: '#FFFFFF',
+      fontFamily: 'Courier New',
+      fontStyle: 'bold'
+    });
+    this.pvpButtonText.setOrigin(0.5);
+
+    this.pvpButton.on('pointerdown', () => {
+      this.enterPvPSelection();
+    });
+
+    this.pvpButton.on('pointerover', () => {
+      this.pvpButton.setFillStyle(0x9944CC);
+    });
+
+    this.pvpButton.on('pointerout', () => {
+      this.pvpButton.setFillStyle(0x663399);
+    });
   }
 
   toggleBulletSelection(index) {
@@ -407,5 +441,350 @@ export default class MenuScene extends Phaser.Scene {
       selectedBullets: this.selectedBullets,
       selectedCharacter: this.selectedCharacter
     });
+  }
+
+  enterPvPSelection() {
+    // Crear grupo para UI de PvP (para poder limpiarla después)
+    this.pvpUIGroup = this.add.group();
+    this.isLocalMultiplayer = false; // Por defecto vs IA
+
+    // Fondo oscuro semi-transparente
+    const overlay = this.add.rectangle(400, 320, 800, 640, 0x000000, 0.8);
+    this.pvpUIGroup.add(overlay);
+
+    // Título
+    const title = this.add.text(400, 60, 'MODO PvP', {
+      fontSize: '42px',
+      fill: '#FF00FF',
+      fontFamily: 'Courier New',
+      fontStyle: 'bold'
+    }).setOrigin(0.5);
+    this.pvpUIGroup.add(title);
+
+    // === SELECTOR DE MODO DE JUEGO ===
+    const modeTitle = this.add.text(400, 110, 'Tipo de batalla:', {
+      fontSize: '16px',
+      fill: '#FFFFFF',
+      fontFamily: 'Courier New'
+    }).setOrigin(0.5);
+    this.pvpUIGroup.add(modeTitle);
+
+    // Botón vs IA
+    this.vsAIButton = this.add.rectangle(300, 145, 160, 35, 0x228B22);
+    this.vsAIButton.setStrokeStyle(3, 0x32CD32);
+    this.vsAIButton.setInteractive({ useHandCursor: true });
+
+    const vsAIText = this.add.text(300, 145, 'vs IA', {
+      fontSize: '18px',
+      fill: '#FFFFFF',
+      fontFamily: 'Courier New',
+      fontStyle: 'bold'
+    }).setOrigin(0.5);
+
+    this.vsAIButton.on('pointerdown', () => {
+      this.isLocalMultiplayer = false;
+      this.updateModeSelection();
+      this.updateOpponentTitle();
+    });
+
+    this.pvpUIGroup.add(this.vsAIButton);
+    this.pvpUIGroup.add(vsAIText);
+
+    // Botón vs Jugador 2
+    this.vsPlayerButton = this.add.rectangle(500, 145, 160, 35, 0x333355);
+    this.vsPlayerButton.setStrokeStyle(2, 0x555577);
+    this.vsPlayerButton.setInteractive({ useHandCursor: true });
+
+    const vsPlayerText = this.add.text(500, 145, 'vs Jugador 2', {
+      fontSize: '18px',
+      fill: '#FFFFFF',
+      fontFamily: 'Courier New',
+      fontStyle: 'bold'
+    }).setOrigin(0.5);
+
+    this.vsPlayerButton.on('pointerdown', () => {
+      this.isLocalMultiplayer = true;
+      this.updateModeSelection();
+      this.updateOpponentTitle();
+    });
+
+    this.pvpUIGroup.add(this.vsPlayerButton);
+    this.pvpUIGroup.add(vsPlayerText);
+
+    // Subtítulo
+    const subtitle = this.add.text(400, 185, 'Elige un personaje para cada lado', {
+      fontSize: '15px',
+      fill: '#FFFFFF',
+      fontFamily: 'Courier New'
+    }).setOrigin(0.5);
+    this.pvpUIGroup.add(subtitle);
+
+    // Sección Jugador 1 (izquierda)
+    const playerTitle = this.add.text(200, 215, 'JUGADOR 1', {
+      fontSize: '20px',
+      fill: '#00FF00',
+      fontFamily: 'Courier New',
+      fontStyle: 'bold'
+    }).setOrigin(0.5);
+    this.pvpUIGroup.add(playerTitle);
+
+    // Botones de personaje del jugador
+    const chars = [
+      { name: 'Mielito', type: 'dolphin', color: '#1E90FF', y: 270 },
+      { name: 'Colombia', type: 'colombiaBall', color: '#FCD116', y: 330 },
+      { name: 'Triángulo', type: 'redTriangle', color: '#FF0000', y: 390 },
+      { name: 'TimeMaster', type: 'timeMaster', color: '#FFD700', y: 450 }
+    ];
+
+    this.pvpPlayerButtons = [];
+    chars.forEach((char, index) => {
+      const btn = this.add.rectangle(200, char.y, 180, 45, 0x333355);
+      btn.setStrokeStyle(2, 0x555577);
+      btn.setInteractive({ useHandCursor: true });
+
+      const text = this.add.text(200, char.y, char.name, {
+        fontSize: '18px',
+        fill: char.color,
+        fontFamily: 'Courier New',
+        fontStyle: 'bold'
+      }).setOrigin(0.5);
+
+      btn.on('pointerdown', () => {
+        this.selectPvPPlayer(char.type, index);
+      });
+
+      btn.on('pointerover', () => {
+        if (this.pvpPlayerCharacter !== char.type) {
+          btn.setFillStyle(0x444466);
+        }
+      });
+
+      btn.on('pointerout', () => {
+        if (this.pvpPlayerCharacter !== char.type) {
+          btn.setFillStyle(0x333355);
+        }
+      });
+
+      this.pvpPlayerButtons.push({ btn, text, type: char.type });
+      this.pvpUIGroup.add(btn);
+      this.pvpUIGroup.add(text);
+    });
+
+    // Sección Oponente (derecha)
+    this.opponentTitle = this.add.text(600, 215, 'OPONENTE IA', {
+      fontSize: '20px',
+      fill: '#FF0000',
+      fontFamily: 'Courier New',
+      fontStyle: 'bold'
+    }).setOrigin(0.5);
+    this.pvpUIGroup.add(this.opponentTitle);
+
+    // Botones de personaje del oponente
+    this.pvpOpponentButtons = [];
+    chars.forEach((char, index) => {
+      const btn = this.add.rectangle(600, char.y, 180, 45, 0x333355);
+      btn.setStrokeStyle(2, 0x555577);
+      btn.setInteractive({ useHandCursor: true });
+
+      const text = this.add.text(600, char.y, char.name, {
+        fontSize: '18px',
+        fill: char.color,
+        fontFamily: 'Courier New',
+        fontStyle: 'bold'
+      }).setOrigin(0.5);
+
+      btn.on('pointerdown', () => {
+        this.selectPvPOpponent(char.type, index);
+      });
+
+      btn.on('pointerover', () => {
+        if (this.pvpOpponentCharacter !== char.type) {
+          btn.setFillStyle(0x444466);
+        }
+      });
+
+      btn.on('pointerout', () => {
+        if (this.pvpOpponentCharacter !== char.type) {
+          btn.setFillStyle(0x333355);
+        }
+      });
+
+      this.pvpOpponentButtons.push({ btn, text, type: char.type });
+      this.pvpUIGroup.add(btn);
+      this.pvpUIGroup.add(text);
+    });
+
+    // Mensaje de estado
+    this.pvpStatusText = this.add.text(400, 440, 'Selecciona ambos personajes', {
+      fontSize: '16px',
+      fill: '#FFFF00',
+      fontFamily: 'Courier New'
+    }).setOrigin(0.5);
+    this.pvpUIGroup.add(this.pvpStatusText);
+
+    // Botón JUGAR PvP
+    this.pvpPlayButton = this.add.rectangle(400, 500, 200, 50, 0x444444);
+    this.pvpPlayButton.setStrokeStyle(2, 0x666666);
+
+    this.pvpPlayButtonText = this.add.text(400, 500, 'JUGAR', {
+      fontSize: '28px',
+      fill: '#666666',
+      fontFamily: 'Courier New',
+      fontStyle: 'bold'
+    }).setOrigin(0.5);
+
+    this.pvpUIGroup.add(this.pvpPlayButton);
+    this.pvpUIGroup.add(this.pvpPlayButtonText);
+
+    // Botón Volver
+    const backButton = this.add.rectangle(400, 570, 160, 40, 0x553333);
+    backButton.setStrokeStyle(2, 0x775555);
+    backButton.setInteractive({ useHandCursor: true });
+
+    const backText = this.add.text(400, 570, 'VOLVER', {
+      fontSize: '18px',
+      fill: '#FFFFFF',
+      fontFamily: 'Courier New',
+      fontStyle: 'bold'
+    }).setOrigin(0.5);
+
+    backButton.on('pointerdown', () => {
+      this.exitPvPSelection();
+    });
+
+    backButton.on('pointerover', () => {
+      backButton.setFillStyle(0x775555);
+    });
+
+    backButton.on('pointerout', () => {
+      backButton.setFillStyle(0x553333);
+    });
+
+    this.pvpUIGroup.add(backButton);
+    this.pvpUIGroup.add(backText);
+  }
+
+  selectPvPPlayer(charType, index) {
+    this.pvpPlayerCharacter = charType;
+
+    // Reset todos los botones del jugador
+    this.pvpPlayerButtons.forEach((item, i) => {
+      if (i === index) {
+        item.btn.setFillStyle(0x225522);
+        item.btn.setStrokeStyle(2, 0x44aa44);
+      } else {
+        item.btn.setFillStyle(0x333355);
+        item.btn.setStrokeStyle(2, 0x555577);
+      }
+    });
+
+    this.updatePvPPlayButton();
+  }
+
+  selectPvPOpponent(charType, index) {
+    this.pvpOpponentCharacter = charType;
+
+    // Reset todos los botones del oponente
+    this.pvpOpponentButtons.forEach((item, i) => {
+      if (i === index) {
+        item.btn.setFillStyle(0x552222);
+        item.btn.setStrokeStyle(2, 0xaa4444);
+      } else {
+        item.btn.setFillStyle(0x333355);
+        item.btn.setStrokeStyle(2, 0x555577);
+      }
+    });
+
+    this.updatePvPPlayButton();
+  }
+
+  updatePvPPlayButton() {
+    if (this.pvpPlayerCharacter && this.pvpOpponentCharacter) {
+      // Activar botón
+      this.pvpPlayButton.setFillStyle(0x228B22);
+      this.pvpPlayButton.setStrokeStyle(2, 0x32CD32);
+      this.pvpPlayButtonText.setFill('#FFFFFF');
+      this.pvpStatusText.setText('¡Listo para luchar!');
+      this.pvpStatusText.setFill('#00FF00');
+
+      this.pvpPlayButton.setInteractive({ useHandCursor: true });
+      this.pvpPlayButton.on('pointerdown', () => {
+        this.startPvPGame();
+      });
+
+      this.pvpPlayButton.on('pointerover', () => {
+        this.pvpPlayButton.setFillStyle(0x32CD32);
+      });
+
+      this.pvpPlayButton.on('pointerout', () => {
+        this.pvpPlayButton.setFillStyle(0x228B22);
+      });
+    } else {
+      // Desactivar botón
+      this.pvpPlayButton.setFillStyle(0x444444);
+      this.pvpPlayButton.setStrokeStyle(2, 0x666666);
+      this.pvpPlayButtonText.setFill('#666666');
+
+      let missing = [];
+      if (!this.pvpPlayerCharacter) missing.push('tu personaje');
+      if (!this.pvpOpponentCharacter) missing.push('el oponente');
+      this.pvpStatusText.setText(`Selecciona ${missing.join(' y ')}`);
+      this.pvpStatusText.setFill('#FFFF00');
+
+      this.pvpPlayButton.removeInteractive();
+      this.pvpPlayButton.off('pointerdown');
+      this.pvpPlayButton.off('pointerover');
+      this.pvpPlayButton.off('pointerout');
+    }
+  }
+
+  startPvPGame() {
+    this.scene.start('PvPScene', {
+      playerCharacter: this.pvpPlayerCharacter,
+      opponentCharacter: this.pvpOpponentCharacter,
+      isLocalMultiplayer: this.isLocalMultiplayer
+    });
+  }
+
+  updateModeSelection() {
+    // Actualizar estilos de botones según el modo seleccionado
+    if (this.isLocalMultiplayer) {
+      // Modo local activado
+      this.vsPlayerButton.setFillStyle(0x228B22);
+      this.vsPlayerButton.setStrokeStyle(3, 0x32CD32);
+      this.vsAIButton.setFillStyle(0x333355);
+      this.vsAIButton.setStrokeStyle(2, 0x555577);
+    } else {
+      // Modo IA activado
+      this.vsAIButton.setFillStyle(0x228B22);
+      this.vsAIButton.setStrokeStyle(3, 0x32CD32);
+      this.vsPlayerButton.setFillStyle(0x333355);
+      this.vsPlayerButton.setStrokeStyle(2, 0x555577);
+    }
+  }
+
+  updateOpponentTitle() {
+    // Actualizar el título del oponente según el modo
+    if (this.isLocalMultiplayer) {
+      this.opponentTitle.setText('JUGADOR 2');
+      this.opponentTitle.setFill('#FF6600');
+    } else {
+      this.opponentTitle.setText('OPONENTE IA');
+      this.opponentTitle.setFill('#FF0000');
+    }
+  }
+
+  exitPvPSelection() {
+    // Limpiar UI de PvP
+    if (this.pvpUIGroup) {
+      this.pvpUIGroup.clear(true, true);
+      this.pvpUIGroup = null;
+    }
+
+    // Resetear selecciones
+    this.pvpPlayerCharacter = null;
+    this.pvpOpponentCharacter = null;
+    this.pvpPlayerButtons = [];
+    this.pvpOpponentButtons = [];
   }
 }

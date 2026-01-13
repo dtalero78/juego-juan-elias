@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 
 export default class Dolphin extends Phaser.Physics.Arcade.Sprite {
-  constructor(scene, x, y, selectedBullets = ['normal', 'fire']) {
+  constructor(scene, x, y, selectedBullets = ['normal', 'fire'], isPvPMode = false) {
     super(scene, x, y, 'dolphin');
 
     scene.add.existing(this);
@@ -20,8 +20,19 @@ export default class Dolphin extends Phaser.Physics.Arcade.Sprite {
     this.jumpForce = -500; // Aumentado para alcanzar plataformas
     this.canShoot = true;
     this.shootCooldown = 250; // ms entre disparos
-    this.health = 3;
-    this.maxHealth = 3;
+
+    // Modo PvP
+    this.isPvPMode = isPvPMode;
+
+    // Vida según modo
+    if (isPvPMode) {
+      this.health = 100;
+      this.maxHealth = 100;
+    } else {
+      this.health = 3;
+      this.maxHealth = 3;
+    }
+
     this.invulnerable = false;
     this.invulnerabilityTime = 1000;
 
@@ -46,6 +57,11 @@ export default class Dolphin extends Phaser.Physics.Arcade.Sprite {
     selectedBullets.forEach(type => {
       this.ammo[type] = initialAmmo[type] || 15;
     });
+
+    // En modo PvP, iniciar con 50 balas
+    if (isPvPMode) {
+      this.ammo[this.bulletType] = 50;
+    }
 
     // Control de animación de ataque
     this.isAttacking = false;
@@ -168,7 +184,7 @@ export default class Dolphin extends Phaser.Physics.Arcade.Sprite {
     this.ammo[this.bulletType]--;
 
     // Emitir evento de disparo con el tipo de bala
-    this.scene.events.emit('dolphinShoot', this.x + 20, this.y, this.bulletType);
+    this.scene.events.emit('dolphinShoot', this.x + 20, this.y, this.bulletType, this.flipX, this);
 
     // Terminar animación de ataque
     this.scene.time.delayedCall(this.attackDuration, () => {
@@ -207,6 +223,14 @@ export default class Dolphin extends Phaser.Physics.Arcade.Sprite {
   addAmmo(type, amount) {
     if (this.ammo.hasOwnProperty(type)) {
       this.ammo[type] += amount;
+    }
+  }
+
+  // Recargar munición automáticamente (para modo PvP)
+  reloadAmmo(amount = 50) {
+    // Recargar el tipo de bala actual
+    if (this.ammo.hasOwnProperty(this.bulletType)) {
+      this.ammo[this.bulletType] += amount;
     }
   }
 

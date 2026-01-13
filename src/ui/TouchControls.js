@@ -1,10 +1,11 @@
 import Phaser from 'phaser';
 
 export default class TouchControls {
-  constructor(scene) {
+  constructor(scene, playerSide = 'player1') {
     this.scene = scene;
     this.buttons = {};
     this.isActive = false;
+    this.playerSide = playerSide; // 'player1' o 'player2'
 
     // Estados de los controles (simula teclas)
     this.state = {
@@ -15,6 +16,9 @@ export default class TouchControls {
       x: false,
       q: false
     };
+
+    // Auto-crear los controles
+    this.create();
   }
 
   create() {
@@ -26,11 +30,14 @@ export default class TouchControls {
     this.container.setDepth(1000);
     this.container.setScrollFactor(0);
 
-    // === LADO IZQUIERDO: D-Pad para movimiento ===
-    const dpadX = 80;
-    const dpadY = height - 100;
+    // Configurar posiciones según el lado del jugador
+    const isPlayer1 = this.playerSide === 'player1';
     const btnSize = 50;
-    const btnAlpha = 0.6;
+
+    // === D-Pad para movimiento ===
+    // Jugador 1: lado izquierdo inferior | Jugador 2: lado derecho inferior
+    const dpadX = isPlayer1 ? 80 : width - 80;
+    const dpadY = height - 100;
 
     // Botón Izquierda
     this.buttons.left = this.createButton(
@@ -56,11 +63,13 @@ export default class TouchControls {
       () => this.state.up = false
     );
 
-    // === LADO DERECHO: Botones de acción ===
-    const actionX = width - 80;
+    // === Botones de acción ===
+    // Jugador 1: lado derecho inferior | Jugador 2: lado izquierdo inferior
+    const actionX = isPlayer1 ? width - 80 : 80;
     const actionY = height - 100;
+    const actionOffsetX = isPlayer1 ? -70 : 70; // Invertir offset para P2
 
-    // Botón Disparar (grande)
+    // Botón Atacar/Disparar (grande)
     this.buttons.shoot = this.createButton(
       actionX, actionY,
       60, '🔫',
@@ -71,20 +80,20 @@ export default class TouchControls {
 
     // Botón Dash (X)
     this.buttons.dash = this.createButton(
-      actionX - 70, actionY,
+      actionX + actionOffsetX, actionY,
       45, '💨',
       () => this.state.x = true,
       () => this.state.x = false,
       0x00CCFF
     );
 
-    // Botón Cambiar bala (Q) - más pequeño arriba
+    // Botón Cambiar/Escudo (Q) - más pequeño arriba
     this.buttons.switchBullet = this.createButton(
       actionX, actionY - 70,
       40, '🔄',
       () => {
         this.state.q = true;
-        // Trigger cambio de bala inmediatamente
+        // Trigger cambio de bala o escudo
         if (this.scene.dolphin) {
           this.scene.dolphin.nextBulletType();
           this.scene.updateAmmoUI();
@@ -101,27 +110,34 @@ export default class TouchControls {
     });
 
     // Instrucciones táctiles (se ocultan después de 5 segundos)
-    this.touchHelp = this.scene.add.text(width / 2, 100,
-      '◀▶ Mover | ▲ Saltar | 🔫 Disparar | 💨 Dash | 🔄 Cambiar bala', {
-      fontSize: '12px',
-      fill: '#ffffff',
-      backgroundColor: '#000000aa',
-      padding: { x: 10, y: 5 }
-    });
-    this.touchHelp.setOrigin(0.5);
-    this.touchHelp.setScrollFactor(0);
-    this.touchHelp.setDepth(1000);
+    // Solo mostrar para Jugador 1 o si es el único
+    if (this.playerSide === 'player1') {
+      const helpText = this.scene.isLocalMultiplayer
+        ? 'Cada jugador usa controles en su lado de la pantalla'
+        : '◀▶ Mover | ▲ Saltar | 🔫 Atacar | 💨 Dash | 🔄 Escudo';
 
-    this.scene.time.delayedCall(5000, () => {
-      if (this.touchHelp) {
-        this.scene.tweens.add({
-          targets: this.touchHelp,
-          alpha: 0,
-          duration: 1000,
-          onComplete: () => this.touchHelp.destroy()
-        });
-      }
-    });
+      this.touchHelp = this.scene.add.text(width / 2, 60,
+        helpText, {
+        fontSize: '11px',
+        fill: '#ffffff',
+        backgroundColor: '#000000aa',
+        padding: { x: 10, y: 5 }
+      });
+      this.touchHelp.setOrigin(0.5);
+      this.touchHelp.setScrollFactor(0);
+      this.touchHelp.setDepth(1000);
+
+      this.scene.time.delayedCall(5000, () => {
+        if (this.touchHelp) {
+          this.scene.tweens.add({
+            targets: this.touchHelp,
+            alpha: 0,
+            duration: 1000,
+            onComplete: () => this.touchHelp.destroy()
+          });
+        }
+      });
+    }
   }
 
   createButton(x, y, size, label, onDown, onUp, color = 0x444444) {

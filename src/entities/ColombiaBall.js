@@ -1,14 +1,14 @@
 import Phaser from 'phaser';
 
 export default class ColombiaBall extends Phaser.Physics.Arcade.Sprite {
-  constructor(scene, x, y) {
-    super(scene, x, y, 'colombiaBall');
+  constructor(scene, x, y, isPvPMode = false) {
+    super(scene, x, y, 'colombia_ball_new');
 
     scene.add.existing(this);
     scene.physics.add.existing(this);
 
-    // Escala
-    this.setScale(0.8);
+    // Escala (ajustada para que sea del tamaño apropiado)
+    this.setScale(0.16);
 
     // Hitbox
     this.body.setSize(this.width * 0.7, this.height * 0.8);
@@ -21,9 +21,18 @@ export default class ColombiaBall extends Phaser.Physics.Arcade.Sprite {
     this.speed = 200;
     this.jumpForce = -480;
 
-    // Vida
-    this.health = 4; // Un poco más de vida que el delfín
-    this.maxHealth = 4;
+    // Modo PvP
+    this.isPvPMode = isPvPMode;
+
+    // Vida según modo
+    if (isPvPMode) {
+      this.health = 100;
+      this.maxHealth = 100;
+    } else {
+      this.health = 4;
+      this.maxHealth = 4;
+    }
+
     this.invulnerable = false;
     this.invulnerabilityTime = 1000;
 
@@ -38,6 +47,8 @@ export default class ColombiaBall extends Phaser.Physics.Arcade.Sprite {
 
     // Bola de energía
     this.energyBallReady = false;
+    this.isEnergyBallMode = false;
+    this.energyBallDamage = 5;
 
     // Control de salto
     this.isInAir = false;
@@ -58,6 +69,9 @@ export default class ColombiaBall extends Phaser.Physics.Arcade.Sprite {
 
   update(cursors, wasd, spaceBar, xKey) {
     if (this.isDashing) return;
+
+    // Si está en modo energy ball, no permitir controles normales
+    if (this.isEnergyBallMode) return;
 
     // Movimiento horizontal
     if (cursors.left.isDown || wasd.a.isDown) {
@@ -126,7 +140,7 @@ export default class ColombiaBall extends Phaser.Physics.Arcade.Sprite {
     // Emitir evento de ataque con el número de combo
     if (this.comboCount <= this.maxCombo) {
       // Golpe cuerpo a cuerpo
-      this.scene.events.emit('colombiaAttack', this.x, this.y, this.comboCount, this.flipX);
+      this.scene.events.emit('colombiaAttack', this.x, this.y, this.comboCount, this.flipX, this);
       this.scene.events.emit('colombiaPunch');
 
       // Efecto visual del golpe
@@ -203,17 +217,132 @@ export default class ColombiaBall extends Phaser.Physics.Arcade.Sprite {
   }
 
   fireEnergyBall() {
-    this.scene.events.emit('colombiaEnergyBall', this.x, this.y, this.flipX);
+    // Disparar una bola de energía separada como proyectil
     this.scene.events.emit('colombiaSpecial');
 
-    // Efecto visual de carga
-    const chargeEffect = this.scene.add.circle(this.x, this.y, 20, 0x9400D3, 0.6);
+    // Dirección del disparo
+    const direction = this.flipX ? -1 : 1;
+    const offsetX = this.flipX ? -40 : 40;
+    const startX = this.x + offsetX;
+    const startY = this.y;
+
+    // Crear esfera negra grande (proyectil principal)
+    const energySphere = this.scene.add.circle(startX, startY, 40, 0x000000, 0.9);
+    energySphere.setStrokeStyle(4, 0xFF0000, 1); // Borde rojo
+    this.scene.physics.add.existing(energySphere);
+    energySphere.body.setCircle(40);
+    energySphere.body.setVelocityX(500 * direction);
+    energySphere.body.setAllowGravity(false);
+
+    // Crear círculo rojo interior pulsante
+    const innerGlow = this.scene.add.circle(startX, startY, 30, 0xFF0000, 0.5);
+
+    // Efecto pulsante de la esfera negra
     this.scene.tweens.add({
-      targets: chargeEffect,
-      scale: 3,
-      alpha: 0,
-      duration: 300,
-      onComplete: () => chargeEffect.destroy()
+      targets: energySphere,
+      scaleX: 1.2,
+      scaleY: 1.2,
+      duration: 150,
+      yoyo: true,
+      repeat: -1
+    });
+
+    // Efecto pulsante del brillo rojo
+    this.scene.tweens.add({
+      targets: innerGlow,
+      alpha: 0.8,
+      scaleX: 1.3,
+      scaleY: 1.3,
+      duration: 200,
+      yoyo: true,
+      repeat: -1
+    });
+
+    // Trail de energía negra con rojo
+    let isActive = true;
+    const trailTimer = this.scene.time.addEvent({
+      delay: 50,
+      callback: () => {
+        if (!isActive || !energySphere.active) {
+          trailTimer.remove();
+          return;
+        }
+        // Partícula negra
+        const trailParticle = this.scene.add.circle(energySphere.x, energySphere.y, 25, 0x000000, 0.7);
+        trailParticle.setStrokeStyle(2, 0xFF0000, 0.8);
+
+        this.scene.tweens.add({
+          targets: trailParticle,
+          scale: 0,
+          alpha: 0,
+          duration: 400,
+          onComplete: () => trailParticle.destroy()
+        });
+
+        // Partícula roja pequeña
+        const redParticle = this.scene.add.circle(
+          energySphere.x + Phaser.Math.Between(-20, 20),
+          energySphere.y + Phaser.Math.Between(-20, 20),
+          8, 0xFF0000, 0.8
+        );
+
+        this.scene.tweens.add({
+          targets: redParticle,
+          scale: 0,
+          alpha: 0,
+          duration: 300,
+          onComplete: () => redParticle.destroy()
+        });
+      },
+      loop: true
+    });
+
+    // Actualizar posición del brillo interior cada frame
+    const updateGlowPosition = () => {
+      if (!isActive || !energySphere.active) {
+        return;
+      }
+      innerGlow.setPosition(energySphere.x, energySphere.y);
+      this.scene.time.delayedCall(16, updateGlowPosition);
+    };
+    updateGlowPosition();
+
+    // Emitir evento para que la escena detecte colisiones con la bola de energía
+    this.scene.events.emit('colombiaEnergyBall', energySphere, this);
+
+    // Destruir el proyectil después de 2 segundos o al salir de pantalla
+    this.scene.time.delayedCall(2000, () => {
+      if (energySphere.active) {
+        isActive = false;
+        trailTimer.remove();
+
+        // Efecto de explosión
+        this.scene.tweens.add({
+          targets: [energySphere, innerGlow],
+          scale: 2,
+          alpha: 0,
+          duration: 200,
+          onComplete: () => {
+            energySphere.destroy();
+            innerGlow.destroy();
+          }
+        });
+      }
+    });
+
+    // Destruir al salir de pantalla
+    this.scene.time.addEvent({
+      delay: 100,
+      callback: () => {
+        if (energySphere.active && (energySphere.x < -100 || energySphere.x > this.scene.cameras.main.width + 100)) {
+          isActive = false;
+          trailTimer.remove();
+          energySphere.destroy();
+          innerGlow.destroy();
+        }
+      },
+      loop: true,
+      repeat: 20
     });
   }
 
@@ -262,7 +391,7 @@ export default class ColombiaBall extends Phaser.Physics.Arcade.Sprite {
     for (let i = 0; i < 3; i++) {
       this.scene.time.delayedCall(i * 50, () => {
         if (!this.scene) return;
-        const ghost = this.scene.add.sprite(this.x, this.y, this.texture.key);
+        const ghost = this.scene.add.sprite(this.x, this.y, 'colombia_ball_new');
         ghost.setScale(this.scaleX, this.scaleY);
         ghost.setFlipX(this.flipX);
         ghost.setTint(colors[i]);
@@ -279,26 +408,8 @@ export default class ColombiaBall extends Phaser.Physics.Arcade.Sprite {
   }
 
   updateSprite() {
-    let newState;
-
-    if (this.isAttacking) {
-      newState = 'attack';
-    } else if (this.isInAir) {
-      newState = 'jump';
-    } else {
-      newState = 'idle';
-    }
-
-    if (newState !== this.currentSpriteState) {
-      this.currentSpriteState = newState;
-      if (newState === 'attack') {
-        this.setTexture('colombiaBall_attack');
-      } else if (newState === 'jump') {
-        this.setTexture('colombiaBall_jump');
-      } else {
-        this.setTexture('colombiaBall');
-      }
-    }
+    // Ya no necesitamos cambiar de sprite, usamos siempre la misma imagen
+    // La textura 'colombia_ball_new' se mantiene constante
   }
 
   takeDamage() {

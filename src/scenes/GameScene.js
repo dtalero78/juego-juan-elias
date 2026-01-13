@@ -96,7 +96,7 @@ export default class GameScene extends Phaser.Scene {
     this.events.on('colombiaPunch', () => this.soundGen.play('hit'), this);
     this.events.on('colombiaSpecial', () => this.soundGen.play('shootFire'), this);
     this.events.on('colombiaAttack', this.handleColombiaAttack, this);
-    this.events.on('colombiaEnergyBall', this.createEnergyBall, this);
+    this.events.on('colombiaEnergyBall', this.handleColombiaEnergyBall, this);
 
     // Eventos para Red Triangle
     this.events.on('triangleJump', () => this.soundGen.play('jump'), this);
@@ -1081,50 +1081,54 @@ export default class GameScene extends Phaser.Scene {
   }
 
   // Crear bola de energía de Colombia Ball
-  createEnergyBall(x, y, flipX) {
-    if (!this.octopus || !this.octopus.active) return;
+  handleColombiaEnergyBall(energySphere, character) {
+    // Configurar colisión entre la bola de energía y el octopus
+    this.physics.add.overlap(energySphere, this.octopus, () => {
+      if (!this.octopus.active || !energySphere.active) return;
 
-    const bullet = this.bullets.get(x, y, 'energyBall');
-    if (bullet) {
-      bullet.setActive(true);
-      bullet.setVisible(true);
-      bullet.body.reset(x, y);
+      const damage = 5;
 
-      const direction = flipX ? -1 : 1;
-      bullet.setVelocityX(500 * direction);
-      bullet.damage = 5;
-      bullet.bulletType = 'energyBall';
-      bullet.setScale(1.2);
+      // Sonido de golpe
+      this.soundGen.play('hit');
 
-      // Efecto de brillo púrpura
+      // Aplicar daño al villano
+      for (let i = 0; i < damage; i++) {
+        if (this.octopus.active) this.octopus.takeDamage();
+      }
+
+      // Efecto visual en el punto de impacto
+      const impactEffect = this.add.circle(this.octopus.x, this.octopus.y, 30, 0x9400D3, 0.8);
       this.tweens.add({
-        targets: bullet,
-        alpha: 0.6,
-        duration: 100,
-        yoyo: true,
-        repeat: -1
+        targets: impactEffect,
+        scale: 2,
+        alpha: 0,
+        duration: 300,
+        onComplete: () => impactEffect.destroy()
       });
 
-      // Trail de energía
-      const trail = this.time.addEvent({
-        delay: 50,
-        callback: () => {
-          if (!bullet.active) {
-            trail.remove();
-            return;
-          }
-          const trailParticle = this.add.circle(bullet.x, bullet.y, 8, 0x9400D3, 0.5);
-          this.tweens.add({
-            targets: trailParticle,
-            scale: 0,
-            alpha: 0,
-            duration: 200,
-            onComplete: () => trailParticle.destroy()
-          });
-        },
-        loop: true
+      // Knock back del pulpo
+      const knockbackDir = this.octopus.x > energySphere.x ? 1 : -1;
+      if (this.octopus.body) {
+        this.octopus.body.setVelocityX(knockbackDir * 200);
+      }
+
+      // Destruir la bola con efecto de explosión
+      energySphere.body.enable = false;
+      this.tweens.add({
+        targets: energySphere,
+        scale: 2,
+        alpha: 0,
+        duration: 200,
+        onComplete: () => {
+          if (energySphere.active) energySphere.destroy();
+        }
       });
-    }
+    });
+  }
+
+  createEnergyBall(x, y, flipX) {
+    // Este método ya no se usa para Colombia Ball
+    // Se mantiene por compatibilidad pero no crea balas
   }
 
   // Crear bola de fuego grande de Red Triangle
@@ -1203,6 +1207,7 @@ export default class GameScene extends Phaser.Scene {
       if (this.octopus && this.octopus.active) {
         this.octopus.update();
       }
+
       // Actualizar plataformas móviles
       this.platforms.forEach(platform => {
         platform.update();

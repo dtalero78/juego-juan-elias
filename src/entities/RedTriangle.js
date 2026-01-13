@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 
 export default class RedTriangle extends Phaser.Physics.Arcade.Sprite {
-  constructor(scene, x, y) {
+  constructor(scene, x, y, isPvPMode = false) {
     super(scene, x, y, 'redTriangle');
 
     scene.add.existing(this);
@@ -21,9 +21,18 @@ export default class RedTriangle extends Phaser.Physics.Arcade.Sprite {
     this.speed = 220;
     this.jumpForce = -500;
 
-    // Vida
-    this.health = 3;
-    this.maxHealth = 3;
+    // Modo PvP
+    this.isPvPMode = isPvPMode;
+
+    // Vida según modo
+    if (isPvPMode) {
+      this.health = 100;
+      this.maxHealth = 100;
+    } else {
+      this.health = 3;
+      this.maxHealth = 3;
+    }
+
     this.invulnerable = false;
     this.invulnerabilityTime = 1000;
 
@@ -118,7 +127,7 @@ export default class RedTriangle extends Phaser.Physics.Arcade.Sprite {
     this.canShoot = false;
 
     // Emitir evento para crear bola de fuego grande
-    this.scene.events.emit('triangleFireball', this.x, this.y, this.flipX);
+    this.scene.events.emit('triangleFireball', this.x, this.y, this.flipX, this);
     this.scene.events.emit('triangleShoot');
 
     // Efecto visual de disparo
