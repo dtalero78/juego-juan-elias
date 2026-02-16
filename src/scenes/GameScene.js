@@ -2,6 +2,8 @@ import Phaser from 'phaser';
 import Dolphin from '../entities/Dolphin.js';
 import ColombiaBall from '../entities/ColombiaBall.js';
 import RedTriangle from '../entities/RedTriangle.js';
+import Clon from '../entities/Clon.js';
+import Torbellino from '../entities/Torbellino.js';
 import Bullet from '../entities/Bullet.js';
 import Octopus from '../entities/Octopus.js';
 import OctopusBullet from '../entities/OctopusBullet.js';
@@ -53,6 +55,9 @@ export default class GameScene extends Phaser.Scene {
     } else if (this.selectedCharacter === 'redTriangle') {
       this.player = new RedTriangle(this, 100, 550);
       this.dolphin = this.player;
+    } else if (this.selectedCharacter === 'clon') {
+      this.player = new Clon(this, 100, 550);
+      this.dolphin = this.player;
     } else {
       this.player = new Dolphin(this, 100, 550, this.selectedBullets);
       this.dolphin = this.player;
@@ -69,6 +74,12 @@ export default class GameScene extends Phaser.Scene {
 
     this.octopusBullets = this.physics.add.group({
       classType: OctopusBullet,
+      runChildUpdate: true
+    });
+
+    // Grupo de torbellinos (Clon)
+    this.torbellinos = this.physics.add.group({
+      classType: Torbellino,
       runChildUpdate: true
     });
 
@@ -105,6 +116,13 @@ export default class GameScene extends Phaser.Scene {
     this.events.on('triangleShield', () => this.soundGen.play('pickup'), this);
     this.events.on('triangleFireball', this.createBigFireball, this);
 
+    // Eventos para Clon
+    this.events.on('clonJump', () => this.soundGen.play('jump'), this);
+    this.events.on('clonDash', () => this.soundGen.play('dash'), this);
+    this.events.on('clonShoot', (x, y, flipX) => {
+      this.createTorbellino(x, y, flipX);
+    }, this);
+
     // Colisiones
     this.physics.add.overlap(
       this.octopus,
@@ -118,6 +136,15 @@ export default class GameScene extends Phaser.Scene {
       this.dolphin,
       this.octopusBullets,
       this.hitDolphin,
+      null,
+      this
+    );
+
+    // Torbellinos golpean al pulpo
+    this.physics.add.overlap(
+      this.octopus,
+      this.torbellinos,
+      this.hitOctopusWithTorbellino,
       null,
       this
     );
@@ -143,7 +170,7 @@ export default class GameScene extends Phaser.Scene {
         if (this.selectedCharacter === 'redTriangle') {
           // Activar escudo de tarjetas
           this.dolphin.activateShield();
-        } else if (this.selectedCharacter !== 'colombiaBall') {
+        } else if (this.selectedCharacter !== 'colombiaBall' && this.selectedCharacter !== 'clon') {
           this.dolphin.nextBulletType();
           this.updateAmmoUI();
         }
@@ -211,6 +238,7 @@ export default class GameScene extends Phaser.Scene {
     let maxHealth = 3;
     if (this.selectedCharacter === 'colombiaBall') maxHealth = 4;
     else if (this.selectedCharacter === 'redTriangle') maxHealth = 3;
+    else if (this.selectedCharacter === 'clon') maxHealth = 4;
 
     this.dolphinHealthText = this.add.text(10, 10, `Vida: ${maxHealth}/${maxHealth}`, {
       fontSize: fontSize,
@@ -233,6 +261,14 @@ export default class GameScene extends Phaser.Scene {
       this.ammoText = this.add.text(10, 35, 'Bola de fuego + Escudo (Q)', {
         fontSize: smallFontSize,
         fill: '#FF4500',
+        fontFamily: 'Courier New',
+        backgroundColor: '#000000aa',
+        padding: { x: 5, y: 2 }
+      });
+    } else if (this.selectedCharacter === 'clon') {
+      this.ammoText = this.add.text(10, 35, 'Torbellino: ∞ | X: Dash', {
+        fontSize: smallFontSize,
+        fill: '#00FF00',
         fontFamily: 'Courier New',
         backgroundColor: '#000000aa',
         padding: { x: 5, y: 2 }
@@ -730,7 +766,7 @@ export default class GameScene extends Phaser.Scene {
       this.soundGen.play('hurt');
 
       const health = this.dolphin.takeDamage();
-      const maxHealth = this.selectedCharacter === 'colombiaBall' ? 4 : 3;
+      const maxHealth = (this.selectedCharacter === 'colombiaBall' || this.selectedCharacter === 'clon') ? 4 : 3;
 
       // Actualizar UI
       if (this.dolphinHealthText) {
@@ -871,8 +907,8 @@ export default class GameScene extends Phaser.Scene {
   collectPowerup(dolphin, powerup) {
     if (!powerup.active) return;
 
-    // Colombia Ball y Red Triangle no usan munición, los powerups le dan vida
-    if (this.selectedCharacter === 'colombiaBall' || this.selectedCharacter === 'redTriangle') {
+    // Colombia Ball, Red Triangle y Clon no usan munición, los powerups le dan vida
+    if (this.selectedCharacter === 'colombiaBall' || this.selectedCharacter === 'redTriangle' || this.selectedCharacter === 'clon') {
       if (dolphin.health < dolphin.maxHealth) {
         dolphin.health++;
         this.soundGen.play('pickup');
@@ -933,6 +969,9 @@ export default class GameScene extends Phaser.Scene {
       this.ammoText.setText(`Combo: ${comboCount}/3 → Bola de energía`);
       return;
     }
+
+    // Clon no tiene munición variable
+    if (this.selectedCharacter === 'clon') return;
 
     const ammo = this.dolphin.ammo;
     const currentType = this.dolphin.bulletType;
@@ -1129,6 +1168,38 @@ export default class GameScene extends Phaser.Scene {
   createEnergyBall(x, y, flipX) {
     // Este método ya no se usa para Colombia Ball
     // Se mantiene por compatibilidad pero no crea balas
+  }
+
+  // Crear torbellino de Clon
+  createTorbellino(x, y, flipX) {
+    if (!this.gameOver && !this.gameWon) {
+      const torb = this.torbellinos.get(x, y);
+      if (torb) {
+        torb.fire(x, y, flipX ? -1 : 1);
+      }
+      this.soundGen.play('shoot');
+    }
+  }
+
+  // Torbellino golpea al pulpo
+  hitOctopusWithTorbellino(octopus, torbellino) {
+    if (!torbellino.active || !octopus.active) return;
+
+    torbellino.setActive(false);
+    torbellino.setVisible(false);
+    torbellino.body.stop();
+    this.tweens.killTweensOf(torbellino);
+
+    this.soundGen.play('hit');
+
+    // El torbellino hace 3 de daño
+    for (let i = 0; i < 3; i++) {
+      if (octopus.active) octopus.takeDamage();
+    }
+
+    if (this.healthText && octopus.active) {
+      this.healthText.setText(`Villano: ${octopus.health}`);
+    }
   }
 
   // Crear bola de fuego grande de Red Triangle

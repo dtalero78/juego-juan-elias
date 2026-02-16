@@ -29,6 +29,10 @@ export default class CharacterAI {
       this.optimalDistance = 200; // Medium range
       this.attackDistance = 300;
       this.aggressiveness = 0.6;
+    } else if (charType === 'Clon') {
+      this.optimalDistance = 220; // Mid-long range
+      this.attackDistance = 350;
+      this.aggressiveness = 0.65;
     } else { // Dolphin
       this.optimalDistance = 250; // Long range
       this.attackDistance = 400;

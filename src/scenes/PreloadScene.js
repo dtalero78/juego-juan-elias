@@ -17,9 +17,12 @@ export default class PreloadScene extends Phaser.Scene {
     // Cargar imagen de Colombia Ball (no es spritesheet, es una imagen única)
     this.load.image('colombia_ball_new', 'assets/colombia_spritesheet.png');
 
-    // Cargar sprites de TimeMaster (personaje volador)
-    this.load.image('timeMaster', 'assets/timemaster.png');
-    this.load.image('timeMasterTimeStop', 'assets/timemaster_timestop.png');
+    // Cargar sprites de Clon
+    this.load.image('clon', 'assets/CLON.png');
+    this.load.image('clonTorbellino', 'assets/CLON TORBELLINO.png');
+
+    // Imagen del personaje para el menú
+    this.load.image('personaje', 'assets/personaje.png');
 
     // Crear sprites placeholder con gráficos generados
     this.createPlaceholderAssets();
@@ -454,21 +457,6 @@ export default class PreloadScene extends Phaser.Scene {
     cardGraphics.generateTexture('blockCard', 20, 30);
     cardGraphics.destroy();
 
-    // Rayo dorado (Golden Ray) - proyectil de TimeMaster
-    const goldenRayGraphics = this.add.graphics();
-    // Forma de rayo/relámpago dorado
-    goldenRayGraphics.fillStyle(0xFFD700, 0.9); // Dorado opaco
-    goldenRayGraphics.fillRect(0, 4, 30, 4);
-    goldenRayGraphics.fillRect(4, 2, 20, 8);
-    // Punta brillante
-    goldenRayGraphics.fillStyle(0xFFFF00, 1);
-    goldenRayGraphics.fillTriangle(28, 6, 36, 6, 32, 2);
-    goldenRayGraphics.fillTriangle(28, 6, 36, 6, 32, 10);
-    // Brillo central
-    goldenRayGraphics.fillStyle(0xFFFFFF, 0.8);
-    goldenRayGraphics.fillRect(8, 5, 12, 2);
-    goldenRayGraphics.generateTexture('goldenRay', 36, 12);
-    goldenRayGraphics.destroy();
   }
 
   create() {

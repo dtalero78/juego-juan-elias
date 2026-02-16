@@ -20,143 +20,87 @@ export default class MenuScene extends Phaser.Scene {
     this.cameras.main.setBackgroundColor('#1a1a2e');
 
     // Tamaños adaptados para móvil
-    const titleSize = this.isMobileDevice ? '28px' : '42px';
     const subtitleSize = this.isMobileDevice ? '14px' : '18px';
     const selectSize = this.isMobileDevice ? '13px' : '16px';
 
-    // Título del juego
-    const title = this.add.text(400, 50, 'MIELITO EL FUGITIVO', {
-      fontSize: titleSize,
-      fill: '#FFD700',
+    // Imagen del personaje detrás del título
+    const personajeImg = this.add.image(400, 65, 'personaje');
+    personajeImg.setAlpha(0.25);
+    const imgScale = this.isMobileDevice ? 0.35 : 0.5;
+    personajeImg.setScale(imgScale);
+    personajeImg.setDepth(0);
+
+    // Título del juego - épico con sombra
+    const titleShadow = this.add.text(402, 32, 'MIELITO EL FUGITIVO', {
+      fontSize: this.isMobileDevice ? '30px' : '48px',
+      fill: '#8B0000',
       fontFamily: 'Courier New',
       fontStyle: 'bold'
     });
+    titleShadow.setOrigin(0.5);
+    titleShadow.setDepth(1);
+
+    const title = this.add.text(400, 30, 'MIELITO EL FUGITIVO', {
+      fontSize: this.isMobileDevice ? '30px' : '48px',
+      fill: '#FFD700',
+      fontFamily: 'Courier New',
+      fontStyle: 'bold',
+      stroke: '#FF4500',
+      strokeThickness: this.isMobileDevice ? 3 : 5
+    });
     title.setOrigin(0.5);
+    title.setDepth(2);
 
     // Subtítulo
-    const subtitle = this.add.text(400, 90, 'Escapa del villano demoniaco', {
+    const subtitle = this.add.text(400, 70, 'Escapa del villano demoniaco', {
       fontSize: subtitleSize,
-      fill: '#aaa',
-      fontFamily: 'Courier New'
+      fill: '#FF6347',
+      fontFamily: 'Courier New',
+      fontStyle: 'bold',
+      stroke: '#000000',
+      strokeThickness: 2
     });
     subtitle.setOrigin(0.5);
+    subtitle.setDepth(2);
 
-    // Instrucciones de selección
-    const selectText = this.add.text(400, 130, 'Selecciona 2 tipos de balas:', {
-      fontSize: selectSize,
-      fill: '#fff',
-      fontFamily: 'Courier New'
-    });
-    selectText.setOrigin(0.5);
-
-    // Tipos de balas disponibles con descripciones cortas para móvil
-    this.bulletTypes = [
-      { type: 'normal', name: 'Normal', color: '#FFD700', desc: 'Daño: 3', descFull: 'Daño: 3 | Velocidad media' },
-      { type: 'fire', name: 'Fuego', color: '#FF4500', desc: 'Quema', descFull: 'Daño: 2 | Quema al enemigo' },
-      { type: 'ice', name: 'Hielo', color: '#00BFFF', desc: 'Congela', descFull: 'Daño: 1 | Congela 2 seg' },
-      { type: 'triple', name: 'Triple', color: '#00FF00', desc: '3 balas', descFull: 'Daño: 1 | Dispara 3 balas' },
-      { type: 'fast', name: 'Rápida', color: '#9400D3', desc: 'Veloz', descFull: 'Daño: 1 | Velocidad x2' },
-      { type: 'teleport', name: 'Teleport', color: '#00FFFF', desc: 'Teletransporta', descFull: 'Daño: 2 | Te teletransporta' },
-      { type: 'xmas', name: 'Navidad', color: '#FF0000', desc: 'Explota!', descFull: 'Daño: 5 | Explosión festiva' }
-    ];
-
-    this.bulletButtons = [];
-    this.selectedBullets = [];
-
-    // Ajustes para móvil (7 tipos de balas ahora)
-    const startY = this.isMobileDevice ? 150 : 165;
-    const spacing = this.isMobileDevice ? 38 : 44;
-    const btnWidth = this.isMobileDevice ? 300 : 350;
-    const btnHeight = this.isMobileDevice ? 36 : 45;
-    const nameSize = this.isMobileDevice ? '16px' : '20px';
-    const descSize = this.isMobileDevice ? '10px' : '12px';
-
-    // Crear botones de selección de balas
-    this.bulletTypes.forEach((bullet, index) => {
-      const y = startY + index * spacing;
-
-      // Fondo del botón
-      const bg = this.add.rectangle(400, y, btnWidth, btnHeight, 0x333355);
-      bg.setInteractive({ useHandCursor: true });
-      bg.setStrokeStyle(2, 0x555577);
-
-      // Nombre de la bala
-      const nameX = this.isMobileDevice ? 270 : 250;
-      const nameText = this.add.text(nameX, y, bullet.name, {
-        fontSize: nameSize,
-        fill: bullet.color,
-        fontFamily: 'Courier New',
-        fontStyle: 'bold'
-      });
-      nameText.setOrigin(0, 0.5);
-
-      // Descripción (más corta en móvil)
-      const descX = this.isMobileDevice ? 520 : 550;
-      const descContent = this.isMobileDevice ? bullet.desc : bullet.descFull;
-      const descText = this.add.text(descX, y, descContent, {
-        fontSize: descSize,
-        fill: '#aaa',
-        fontFamily: 'Courier New'
-      });
-      descText.setOrigin(1, 0.5);
-
-      // Indicador de selección
-      const checkX = this.isMobileDevice ? 560 : 600;
-      const checkmark = this.add.text(checkX, y, '', {
-        fontSize: this.isMobileDevice ? '20px' : '24px',
-        fill: '#00FF00',
-        fontFamily: 'Courier New'
-      });
-      checkmark.setOrigin(0.5);
-
-      // Guardar referencia
-      this.bulletButtons.push({
-        type: bullet.type,
-        bg,
-        checkmark,
-        selected: false
-      });
-
-      // Evento de click/touch
-      bg.on('pointerdown', () => {
-        this.toggleBulletSelection(index);
-      });
-
-      bg.on('pointerover', () => {
-        if (!this.bulletButtons[index].selected) {
-          bg.setFillStyle(0x444466);
-        }
-      });
-
-      bg.on('pointerout', () => {
-        if (!this.bulletButtons[index].selected) {
-          bg.setFillStyle(0x333355);
-        }
-      });
+    // Animación de pulso en el título
+    this.tweens.add({
+      targets: title,
+      scaleX: 1.05,
+      scaleY: 1.05,
+      duration: 1500,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut'
     });
 
-    // Posiciones adaptadas para móvil
-    const charSelectY = this.isMobileDevice ? 390 : 460;
-    const bossSelectY = this.isMobileDevice ? 450 : 520;
-    const selectionY = this.isMobileDevice ? 505 : 570;
-    const playBtnY = this.isMobileDevice ? 545 : 605;
-    const controlsY = this.isMobileDevice ? 595 : 640;
+    // Animación suave en la imagen de fondo
+    this.tweens.add({
+      targets: personajeImg,
+      alpha: 0.15,
+      duration: 2000,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut'
+    });
 
-    // Selector de Personaje
-    const charText = this.add.text(400, charSelectY - 20, 'Elige tu personaje:', {
+    // === SELECTOR DE PERSONAJE (arriba, justo después del título) ===
+    const charSelectY = this.isMobileDevice ? 108 : 115;
+
+    const charText = this.add.text(400, charSelectY - 15, 'Elige tu personaje:', {
       fontSize: this.isMobileDevice ? '11px' : '13px',
       fill: '#fff',
       fontFamily: 'Courier New'
     });
     charText.setOrigin(0.5);
 
-    const charBtnWidth = this.isMobileDevice ? 95 : 120;
+    const charBtnWidth = this.isMobileDevice ? 80 : 95;
     // Botón Mielito (Delfín)
-    this.char1Btn = this.add.rectangle(200, charSelectY, charBtnWidth, 28, 0x225522);
+    this.char1Btn = this.add.rectangle(130, charSelectY, charBtnWidth, 28, 0x225522);
     this.char1Btn.setStrokeStyle(2, 0x44aa44);
     this.char1Btn.setInteractive({ useHandCursor: true });
 
-    this.char1Text = this.add.text(200, charSelectY, 'Mielito', {
+    this.char1Text = this.add.text(130, charSelectY, 'Mielito', {
       fontSize: this.isMobileDevice ? '9px' : '11px',
       fill: '#1E90FF',
       fontFamily: 'Courier New',
@@ -165,11 +109,11 @@ export default class MenuScene extends Phaser.Scene {
     this.char1Text.setOrigin(0.5);
 
     // Botón Colombia Ball
-    this.char2Btn = this.add.rectangle(400, charSelectY, charBtnWidth, 28, 0x333355);
+    this.char2Btn = this.add.rectangle(310, charSelectY, charBtnWidth, 28, 0x333355);
     this.char2Btn.setStrokeStyle(2, 0x555577);
     this.char2Btn.setInteractive({ useHandCursor: true });
 
-    this.char2Text = this.add.text(400, charSelectY, 'Colombia', {
+    this.char2Text = this.add.text(310, charSelectY, 'Colombia', {
       fontSize: this.isMobileDevice ? '9px' : '11px',
       fill: '#FCD116',
       fontFamily: 'Courier New',
@@ -178,11 +122,11 @@ export default class MenuScene extends Phaser.Scene {
     this.char2Text.setOrigin(0.5);
 
     // Botón Red Triangle
-    this.char3Btn = this.add.rectangle(600, charSelectY, charBtnWidth, 28, 0x333355);
+    this.char3Btn = this.add.rectangle(490, charSelectY, charBtnWidth, 28, 0x333355);
     this.char3Btn.setStrokeStyle(2, 0x555577);
     this.char3Btn.setInteractive({ useHandCursor: true });
 
-    this.char3Text = this.add.text(600, charSelectY, 'Triángulo', {
+    this.char3Text = this.add.text(490, charSelectY, 'Triángulo', {
       fontSize: this.isMobileDevice ? '9px' : '11px',
       fill: '#FF0000',
       fontFamily: 'Courier New',
@@ -190,10 +134,24 @@ export default class MenuScene extends Phaser.Scene {
     });
     this.char3Text.setOrigin(0.5);
 
+    // Botón Clon
+    this.char4Btn = this.add.rectangle(670, charSelectY, charBtnWidth, 28, 0x333355);
+    this.char4Btn.setStrokeStyle(2, 0x555577);
+    this.char4Btn.setInteractive({ useHandCursor: true });
+
+    this.char4Text = this.add.text(670, charSelectY, 'Clon', {
+      fontSize: this.isMobileDevice ? '9px' : '11px',
+      fill: '#00FF00',
+      fontFamily: 'Courier New',
+      fontStyle: 'bold'
+    });
+    this.char4Text.setOrigin(0.5);
+
     // Eventos de selección de personaje
     this.char1Btn.on('pointerdown', () => this.selectCharacter('dolphin'));
     this.char2Btn.on('pointerdown', () => this.selectCharacter('colombiaBall'));
     this.char3Btn.on('pointerdown', () => this.selectCharacter('redTriangle'));
+    this.char4Btn.on('pointerdown', () => this.selectCharacter('clon'));
 
     this.char1Btn.on('pointerover', () => {
       if (this.selectedCharacter !== 'dolphin') this.char1Btn.setFillStyle(0x334433);
@@ -213,16 +171,23 @@ export default class MenuScene extends Phaser.Scene {
     this.char3Btn.on('pointerout', () => {
       if (this.selectedCharacter !== 'redTriangle') this.char3Btn.setFillStyle(0x333355);
     });
+    this.char4Btn.on('pointerover', () => {
+      if (this.selectedCharacter !== 'clon') this.char4Btn.setFillStyle(0x224422);
+    });
+    this.char4Btn.on('pointerout', () => {
+      if (this.selectedCharacter !== 'clon') this.char4Btn.setFillStyle(0x333355);
+    });
 
-    // Selector de Boss
-    const bossText = this.add.text(400, bossSelectY - 20, 'Elige tu enemigo:', {
+    // === SELECTOR DE BOSS ===
+    const bossSelectY = this.isMobileDevice ? 148 : 155;
+
+    const bossText = this.add.text(400, bossSelectY - 15, 'Elige tu enemigo:', {
       fontSize: this.isMobileDevice ? '11px' : '13px',
       fill: '#fff',
       fontFamily: 'Courier New'
     });
     bossText.setOrigin(0.5);
 
-    // Botón Boss 1 - Pulpo
     const boss1BtnWidth = this.isMobileDevice ? 140 : 170;
     this.boss1Btn = this.add.rectangle(300, bossSelectY, boss1BtnWidth, 30, 0x225522);
     this.boss1Btn.setStrokeStyle(2, 0x44aa44);
@@ -236,7 +201,6 @@ export default class MenuScene extends Phaser.Scene {
     });
     this.boss1Text.setOrigin(0.5);
 
-    // Botón Boss 2 - Ice Boss
     this.boss2Btn = this.add.rectangle(500, bossSelectY, boss1BtnWidth, 30, 0x333355);
     this.boss2Btn.setStrokeStyle(2, 0x555577);
     this.boss2Btn.setInteractive({ useHandCursor: true });
@@ -249,7 +213,6 @@ export default class MenuScene extends Phaser.Scene {
     });
     this.boss2Text.setOrigin(0.5);
 
-    // Eventos de selección de boss
     this.boss1Btn.on('pointerdown', () => this.selectBoss('octopus'));
     this.boss2Btn.on('pointerdown', () => this.selectBoss('iceBoss'));
 
@@ -266,7 +229,103 @@ export default class MenuScene extends Phaser.Scene {
       if (this.selectedBoss !== 'iceBoss') this.boss2Btn.setFillStyle(0x333355);
     });
 
-    // Texto de selección actual
+    // === SELECCIÓN DE BALAS (solo visible para Mielito) ===
+    this.bulletUIElements = [];
+
+    this.bulletSelectText = this.add.text(400, this.isMobileDevice ? 175 : 185, 'Selecciona 2 tipos de balas:', {
+      fontSize: selectSize,
+      fill: '#fff',
+      fontFamily: 'Courier New'
+    });
+    this.bulletSelectText.setOrigin(0.5);
+    this.bulletUIElements.push(this.bulletSelectText);
+
+    this.bulletTypes = [
+      { type: 'normal', name: 'Normal', color: '#FFD700', desc: 'Daño: 3', descFull: 'Daño: 3 | Velocidad media' },
+      { type: 'fire', name: 'Fuego', color: '#FF4500', desc: 'Quema', descFull: 'Daño: 2 | Quema al enemigo' },
+      { type: 'ice', name: 'Hielo', color: '#00BFFF', desc: 'Congela', descFull: 'Daño: 1 | Congela 2 seg' },
+      { type: 'triple', name: 'Triple', color: '#00FF00', desc: '3 balas', descFull: 'Daño: 1 | Dispara 3 balas' },
+      { type: 'fast', name: 'Rápida', color: '#9400D3', desc: 'Veloz', descFull: 'Daño: 1 | Velocidad x2' },
+      { type: 'teleport', name: 'Teleport', color: '#00FFFF', desc: 'Teletransporta', descFull: 'Daño: 2 | Te teletransporta' },
+      { type: 'xmas', name: 'Navidad', color: '#FF0000', desc: 'Explota!', descFull: 'Daño: 5 | Explosión festiva' }
+    ];
+
+    this.bulletButtons = [];
+    this.selectedBullets = [];
+
+    const startY = this.isMobileDevice ? 198 : 210;
+    const spacing = this.isMobileDevice ? 36 : 42;
+    const btnWidth = this.isMobileDevice ? 300 : 350;
+    const btnHeight = this.isMobileDevice ? 34 : 40;
+    const nameSize = this.isMobileDevice ? '14px' : '18px';
+    const descSize = this.isMobileDevice ? '10px' : '12px';
+
+    this.bulletTypes.forEach((bullet, index) => {
+      const y = startY + index * spacing;
+
+      const bg = this.add.rectangle(400, y, btnWidth, btnHeight, 0x333355);
+      bg.setInteractive({ useHandCursor: true });
+      bg.setStrokeStyle(2, 0x555577);
+
+      const nameX = this.isMobileDevice ? 270 : 250;
+      const nameText = this.add.text(nameX, y, bullet.name, {
+        fontSize: nameSize,
+        fill: bullet.color,
+        fontFamily: 'Courier New',
+        fontStyle: 'bold'
+      });
+      nameText.setOrigin(0, 0.5);
+
+      const descX = this.isMobileDevice ? 520 : 550;
+      const descContent = this.isMobileDevice ? bullet.desc : bullet.descFull;
+      const descText = this.add.text(descX, y, descContent, {
+        fontSize: descSize,
+        fill: '#aaa',
+        fontFamily: 'Courier New'
+      });
+      descText.setOrigin(1, 0.5);
+
+      const checkX = this.isMobileDevice ? 560 : 600;
+      const checkmark = this.add.text(checkX, y, '', {
+        fontSize: this.isMobileDevice ? '20px' : '24px',
+        fill: '#00FF00',
+        fontFamily: 'Courier New'
+      });
+      checkmark.setOrigin(0.5);
+
+      this.bulletButtons.push({
+        type: bullet.type,
+        bg,
+        checkmark,
+        nameText,
+        descText,
+        selected: false
+      });
+
+      this.bulletUIElements.push(bg, nameText, descText, checkmark);
+
+      bg.on('pointerdown', () => {
+        this.toggleBulletSelection(index);
+      });
+
+      bg.on('pointerover', () => {
+        if (!this.bulletButtons[index].selected) {
+          bg.setFillStyle(0x444466);
+        }
+      });
+
+      bg.on('pointerout', () => {
+        if (!this.bulletButtons[index].selected) {
+          bg.setFillStyle(0x333355);
+        }
+      });
+    });
+
+    // === TEXTO DE ESTADO Y BOTONES DE JUEGO ===
+    const selectionY = this.isMobileDevice ? 460 : 510;
+    const playBtnY = this.isMobileDevice ? 500 : 555;
+    const controlsY = this.isMobileDevice ? 545 : 600;
+
     this.selectionText = this.add.text(400, selectionY, 'Selecciona 2 tipos de balas', {
       fontSize: this.isMobileDevice ? '12px' : '14px',
       fill: '#ff6666',
@@ -274,47 +333,27 @@ export default class MenuScene extends Phaser.Scene {
     });
     this.selectionText.setOrigin(0.5);
 
-    // Botón de jugar
-    const playBtnWidth = this.isMobileDevice ? 160 : 200;
-    const playBtnHeight = this.isMobileDevice ? 45 : 50;
-    this.playButton = this.add.rectangle(400, playBtnY, playBtnWidth, playBtnHeight, 0x444444);
+    // Botón de JUGAR (vs Boss) - izquierda
+    const sideBtnWidth = this.isMobileDevice ? 150 : 180;
+    const sideBtnHeight = this.isMobileDevice ? 45 : 50;
+
+    this.playButton = this.add.rectangle(300, playBtnY, sideBtnWidth, sideBtnHeight, 0x444444);
     this.playButton.setStrokeStyle(2, 0x666666);
 
-    this.playButtonText = this.add.text(400, playBtnY, 'JUGAR', {
-      fontSize: this.isMobileDevice ? '20px' : '24px',
+    this.playButtonText = this.add.text(300, playBtnY, 'VS BOSS', {
+      fontSize: this.isMobileDevice ? '18px' : '22px',
       fill: '#666666',
       fontFamily: 'Courier New',
       fontStyle: 'bold'
     });
     this.playButtonText.setOrigin(0.5);
 
-    // Instrucciones de controles (solo en desktop)
-    if (!this.isMobileDevice) {
-      const controls = this.add.text(400, controlsY, 'Controles: A/D = Mover | W = Saltar | ESPACIO = Disparar | Q = Cambiar bala', {
-        fontSize: '11px',
-        fill: '#666',
-        fontFamily: 'Courier New'
-      });
-      controls.setOrigin(0.5);
-    } else {
-      const mobileHint = this.add.text(400, controlsY, 'Usa los controles táctiles en pantalla', {
-        fontSize: '10px',
-        fill: '#666',
-        fontFamily: 'Courier New'
-      });
-      mobileHint.setOrigin(0.5);
-    }
-
-    // Botón Modo PvP
-    const pvpBtnY = this.isMobileDevice ? 555 : 590;
-    const pvpBtnWidth = this.isMobileDevice ? 160 : 200;
-    const pvpBtnHeight = this.isMobileDevice ? 40 : 45;
-
-    this.pvpButton = this.add.rectangle(400, pvpBtnY, pvpBtnWidth, pvpBtnHeight, 0x663399);
+    // Botón Modo PvP - derecha (al lado del de boss)
+    this.pvpButton = this.add.rectangle(500, playBtnY, sideBtnWidth, sideBtnHeight, 0x663399);
     this.pvpButton.setStrokeStyle(2, 0x9944CC);
     this.pvpButton.setInteractive({ useHandCursor: true });
 
-    this.pvpButtonText = this.add.text(400, pvpBtnY, 'MODO PvP', {
+    this.pvpButtonText = this.add.text(500, playBtnY, 'MODO PvP', {
       fontSize: this.isMobileDevice ? '18px' : '22px',
       fill: '#FFFFFF',
       fontFamily: 'Courier New',
@@ -333,24 +372,42 @@ export default class MenuScene extends Phaser.Scene {
     this.pvpButton.on('pointerout', () => {
       this.pvpButton.setFillStyle(0x663399);
     });
+
+    // Instrucciones de controles
+    if (!this.isMobileDevice) {
+      const controls = this.add.text(400, controlsY, 'Controles: A/D = Mover | W = Saltar | ESPACIO = Disparar | Q = Cambiar bala', {
+        fontSize: '11px',
+        fill: '#666',
+        fontFamily: 'Courier New'
+      });
+      controls.setOrigin(0.5);
+    } else {
+      const mobileHint = this.add.text(400, controlsY, 'Usa los controles táctiles en pantalla', {
+        fontSize: '10px',
+        fill: '#666',
+        fontFamily: 'Courier New'
+      });
+      mobileHint.setOrigin(0.5);
+    }
+
+    // Inicializar visibilidad de balas y estado del botón play
+    this.updateBulletVisibility();
+    this.updatePlayButton();
   }
 
   toggleBulletSelection(index) {
     const button = this.bulletButtons[index];
 
     if (button.selected) {
-      // Deseleccionar
       button.selected = false;
       button.bg.setFillStyle(0x333355);
       button.bg.setStrokeStyle(2, 0x555577);
       button.checkmark.setText('');
       this.selectedBullets = this.selectedBullets.filter(t => t !== button.type);
     } else {
-      // Verificar si ya hay 2 seleccionados
       if (this.selectedBullets.length >= 2) {
         return;
       }
-      // Seleccionar
       button.selected = true;
       button.bg.setFillStyle(0x225522);
       button.bg.setStrokeStyle(2, 0x44aa44);
@@ -361,14 +418,27 @@ export default class MenuScene extends Phaser.Scene {
     this.updatePlayButton();
   }
 
+  updateBulletVisibility() {
+    const showBullets = this.selectedCharacter === 'dolphin';
+    this.bulletUIElements.forEach(el => el.setVisible(showBullets));
+  }
+
   updatePlayButton() {
-    if (this.selectedBullets.length === 2) {
-      // Activar botón
+    const isDolphin = this.selectedCharacter === 'dolphin';
+    const canPlay = isDolphin ? this.selectedBullets.length === 2 : true;
+
+    if (canPlay) {
       this.playButton.setFillStyle(0x228B22);
       this.playButton.setStrokeStyle(2, 0x32CD32);
       this.playButtonText.setFill('#ffffff');
-      this.selectionText.setText('¡Listo para jugar!');
-      this.selectionText.setFill('#00ff00');
+
+      if (isDolphin) {
+        this.selectionText.setText('¡Listo para jugar!');
+        this.selectionText.setFill('#00ff00');
+      } else {
+        this.selectionText.setText('¡Personaje listo!');
+        this.selectionText.setFill('#00ff00');
+      }
 
       this.playButton.setInteractive({ useHandCursor: true });
       this.playButton.on('pointerdown', () => {
@@ -381,7 +451,6 @@ export default class MenuScene extends Phaser.Scene {
         this.playButton.setFillStyle(0x228B22);
       });
     } else {
-      // Desactivar botón
       this.playButton.setFillStyle(0x444444);
       this.playButton.setStrokeStyle(2, 0x666666);
       this.playButtonText.setFill('#666666');
@@ -404,6 +473,8 @@ export default class MenuScene extends Phaser.Scene {
     this.char2Btn.setStrokeStyle(2, 0x555577);
     this.char3Btn.setFillStyle(0x333355);
     this.char3Btn.setStrokeStyle(2, 0x555577);
+    this.char4Btn.setFillStyle(0x333355);
+    this.char4Btn.setStrokeStyle(2, 0x555577);
 
     // Activar el seleccionado
     if (charType === 'dolphin') {
@@ -415,7 +486,24 @@ export default class MenuScene extends Phaser.Scene {
     } else if (charType === 'redTriangle') {
       this.char3Btn.setFillStyle(0x552222);
       this.char3Btn.setStrokeStyle(2, 0xaa4444);
+    } else if (charType === 'clon') {
+      this.char4Btn.setFillStyle(0x225522);
+      this.char4Btn.setStrokeStyle(2, 0x44aa44);
     }
+
+    // Si no es dolphin, limpiar selección de balas (clon, colombiaBall, redTriangle no usan balas)
+    if (charType !== 'dolphin') {
+      this.selectedBullets = [];
+      this.bulletButtons.forEach(btn => {
+        btn.selected = false;
+        btn.bg.setFillStyle(0x333355);
+        btn.bg.setStrokeStyle(2, 0x555577);
+        btn.checkmark.setText('');
+      });
+    }
+
+    this.updateBulletVisibility();
+    this.updatePlayButton();
   }
 
   selectBoss(bossType) {
@@ -435,7 +523,6 @@ export default class MenuScene extends Phaser.Scene {
   }
 
   startGame() {
-    // Elegir escena según el boss seleccionado
     const sceneName = this.selectedBoss === 'iceBoss' ? 'IceBossScene' : 'GameScene';
     this.scene.start(sceneName, {
       selectedBullets: this.selectedBullets,
@@ -512,12 +599,12 @@ export default class MenuScene extends Phaser.Scene {
     this.pvpUIGroup.add(vsPlayerText);
 
     // Subtítulo
-    const subtitle = this.add.text(400, 185, 'Elige un personaje para cada lado', {
+    const pvpSubtitle = this.add.text(400, 185, 'Elige un personaje para cada lado', {
       fontSize: '15px',
       fill: '#FFFFFF',
       fontFamily: 'Courier New'
     }).setOrigin(0.5);
-    this.pvpUIGroup.add(subtitle);
+    this.pvpUIGroup.add(pvpSubtitle);
 
     // Sección Jugador 1 (izquierda)
     const playerTitle = this.add.text(200, 215, 'JUGADOR 1', {
@@ -533,7 +620,7 @@ export default class MenuScene extends Phaser.Scene {
       { name: 'Mielito', type: 'dolphin', color: '#1E90FF', y: 270 },
       { name: 'Colombia', type: 'colombiaBall', color: '#FCD116', y: 330 },
       { name: 'Triángulo', type: 'redTriangle', color: '#FF0000', y: 390 },
-      { name: 'TimeMaster', type: 'timeMaster', color: '#FFD700', y: 450 }
+      { name: 'Clon', type: 'clon', color: '#00FF00', y: 450 }
     ];
 
     this.pvpPlayerButtons = [];
@@ -667,7 +754,6 @@ export default class MenuScene extends Phaser.Scene {
   selectPvPPlayer(charType, index) {
     this.pvpPlayerCharacter = charType;
 
-    // Reset todos los botones del jugador
     this.pvpPlayerButtons.forEach((item, i) => {
       if (i === index) {
         item.btn.setFillStyle(0x225522);
@@ -684,7 +770,6 @@ export default class MenuScene extends Phaser.Scene {
   selectPvPOpponent(charType, index) {
     this.pvpOpponentCharacter = charType;
 
-    // Reset todos los botones del oponente
     this.pvpOpponentButtons.forEach((item, i) => {
       if (i === index) {
         item.btn.setFillStyle(0x552222);
@@ -700,7 +785,6 @@ export default class MenuScene extends Phaser.Scene {
 
   updatePvPPlayButton() {
     if (this.pvpPlayerCharacter && this.pvpOpponentCharacter) {
-      // Activar botón
       this.pvpPlayButton.setFillStyle(0x228B22);
       this.pvpPlayButton.setStrokeStyle(2, 0x32CD32);
       this.pvpPlayButtonText.setFill('#FFFFFF');
@@ -720,7 +804,6 @@ export default class MenuScene extends Phaser.Scene {
         this.pvpPlayButton.setFillStyle(0x228B22);
       });
     } else {
-      // Desactivar botón
       this.pvpPlayButton.setFillStyle(0x444444);
       this.pvpPlayButton.setStrokeStyle(2, 0x666666);
       this.pvpPlayButtonText.setFill('#666666');
@@ -747,15 +830,12 @@ export default class MenuScene extends Phaser.Scene {
   }
 
   updateModeSelection() {
-    // Actualizar estilos de botones según el modo seleccionado
     if (this.isLocalMultiplayer) {
-      // Modo local activado
       this.vsPlayerButton.setFillStyle(0x228B22);
       this.vsPlayerButton.setStrokeStyle(3, 0x32CD32);
       this.vsAIButton.setFillStyle(0x333355);
       this.vsAIButton.setStrokeStyle(2, 0x555577);
     } else {
-      // Modo IA activado
       this.vsAIButton.setFillStyle(0x228B22);
       this.vsAIButton.setStrokeStyle(3, 0x32CD32);
       this.vsPlayerButton.setFillStyle(0x333355);
@@ -764,7 +844,6 @@ export default class MenuScene extends Phaser.Scene {
   }
 
   updateOpponentTitle() {
-    // Actualizar el título del oponente según el modo
     if (this.isLocalMultiplayer) {
       this.opponentTitle.setText('JUGADOR 2');
       this.opponentTitle.setFill('#FF6600');
@@ -775,13 +854,11 @@ export default class MenuScene extends Phaser.Scene {
   }
 
   exitPvPSelection() {
-    // Limpiar UI de PvP
     if (this.pvpUIGroup) {
       this.pvpUIGroup.clear(true, true);
       this.pvpUIGroup = null;
     }
 
-    // Resetear selecciones
     this.pvpPlayerCharacter = null;
     this.pvpOpponentCharacter = null;
     this.pvpPlayerButtons = [];

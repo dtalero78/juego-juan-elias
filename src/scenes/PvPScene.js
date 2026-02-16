@@ -2,9 +2,9 @@ import Phaser from 'phaser';
 import Dolphin from '../entities/Dolphin.js';
 import ColombiaBall from '../entities/ColombiaBall.js';
 import RedTriangle from '../entities/RedTriangle.js';
-import TimeMaster from '../entities/TimeMaster.js';
+import Clon from '../entities/Clon.js';
 import Bullet from '../entities/Bullet.js';
-import GoldenRay from '../entities/GoldenRay.js';
+import Torbellino from '../entities/Torbellino.js';
 import Platform from '../entities/Platform.js';
 import CharacterAI from '../entities/CharacterAI.js';
 import SoundGenerator from '../utils/SoundGenerator.js';
@@ -91,14 +91,14 @@ export default class PvPScene extends Phaser.Scene {
       runChildUpdate: true
     });
 
-    // Grupos de rayos dorados (TimeMaster)
-    this.playerGoldenRays = this.physics.add.group({
-      classType: GoldenRay,
+    // Grupos de torbellinos (Clon)
+    this.playerTorbellinos = this.physics.add.group({
+      classType: Torbellino,
       runChildUpdate: true
     });
 
-    this.opponentGoldenRays = this.physics.add.group({
-      classType: GoldenRay,
+    this.opponentTorbellinos = this.physics.add.group({
+      classType: Torbellino,
       runChildUpdate: true
     });
 
@@ -135,9 +135,9 @@ export default class PvPScene extends Phaser.Scene {
     } else if (type === 'redTriangle') {
       // RedTriangle en modo PvP
       character = new RedTriangle(this, x, y, true);
-    } else if (type === 'timeMaster') {
-      // TimeMaster en modo PvP - personaje volador
-      character = new TimeMaster(this, x, y, true);
+    } else if (type === 'clon') {
+      // Clon en modo PvP
+      character = new Clon(this, x, y, true);
     } else {
       // Dolphin en modo PvP
       character = new Dolphin(this, x, y, ['normal', 'fire'], true);
@@ -210,19 +210,19 @@ export default class PvPScene extends Phaser.Scene {
       this
     );
 
-    // Jugador golpeado por rayos dorados del oponente
+    // Jugador golpeado por torbellinos del oponente
     this.physics.add.overlap(
       this.player,
-      this.opponentGoldenRays,
+      this.opponentTorbellinos,
       this.hitPlayer,
       null,
       this
     );
 
-    // Oponente golpeado por rayos dorados del jugador
+    // Oponente golpeado por torbellinos del jugador
     this.physics.add.overlap(
       this.opponent,
-      this.playerGoldenRays,
+      this.playerTorbellinos,
       this.hitOpponent,
       null,
       this
@@ -293,35 +293,20 @@ export default class PvPScene extends Phaser.Scene {
       }
     });
 
-    // TimeMaster - rayos dorados
-    this.events.on('timeMasterShoot', (x, y, flipX, character) => {
+    // Clon - torbellinos
+    this.events.on('clonShoot', (x, y, flipX, character) => {
       if (character === this.player || character?.isPlayer1) {
-        this.createPlayerGoldenRay(x, y, flipX);
+        this.createPlayerTorbellino(x, y, flipX);
       } else {
-        this.createOpponentGoldenRay(x, y, flipX);
+        this.createOpponentTorbellino(x, y, flipX);
       }
-    });
-
-    // TimeMaster - parar el tiempo
-    this.events.on('timeStopActivated', (character) => {
-      // Pausar al oponente durante el Time Stop
-      const target = (character === this.player || character?.isPlayer1) ? this.opponent : this.player;
-      target.timeStopped = true;
-
-      // Efecto visual de tiempo detenido
-      target.setTint(0x8888FF);
-    });
-
-    this.events.on('timeStopDeactivated', (character) => {
-      // Reactivar al oponente
-      const target = (character === this.player || character?.isPlayer1) ? this.opponent : this.player;
-      target.timeStopped = false;
-      target.clearTint();
     });
 
     // Sonidos
     this.events.on('dolphinJump', () => this.soundGen.play('jump'));
     this.events.on('dolphinDash', () => this.soundGen.play('dash'));
+    this.events.on('clonJump', () => this.soundGen.play('jump'));
+    this.events.on('clonDash', () => this.soundGen.play('dash'));
     this.events.on('colombiaJump', () => this.soundGen.play('jump'));
     this.events.on('colombiaDash', () => this.soundGen.play('dash'));
     this.events.on('colombiaPunch', () => this.soundGen.play('hit'));
@@ -466,17 +451,17 @@ export default class PvPScene extends Phaser.Scene {
     }
   }
 
-  createPlayerGoldenRay(x, y, flipX) {
-    const ray = this.playerGoldenRays.get(x, y);
-    if (ray) {
-      ray.fire(x, y, flipX ? -1 : 1);
+  createPlayerTorbellino(x, y, flipX) {
+    const torb = this.playerTorbellinos.get(x, y);
+    if (torb) {
+      torb.fire(x, y, flipX ? -1 : 1);
     }
   }
 
-  createOpponentGoldenRay(x, y, flipX) {
-    const ray = this.opponentGoldenRays.get(x, y);
-    if (ray) {
-      ray.fire(x, y, flipX ? -1 : 1);
+  createOpponentTorbellino(x, y, flipX) {
+    const torb = this.opponentTorbellinos.get(x, y);
+    if (torb) {
+      torb.fire(x, y, flipX ? -1 : 1);
     }
   }
 
@@ -616,10 +601,7 @@ export default class PvPScene extends Phaser.Scene {
       qKey = this.qKey;
     }
 
-    // Solo actualizar si no tiene el tiempo detenido
-    if (!this.player.timeStopped) {
-      this.player.update(cursors, wasd, spaceBar, xKey, qKey);
-    }
+    this.player.update(cursors, wasd, spaceBar, xKey, qKey);
 
     // Actualizar oponente
     if (this.isLocalMultiplayer) {
@@ -652,16 +634,11 @@ export default class PvPScene extends Phaser.Scene {
         };
       }
 
-      // Solo actualizar si no tiene el tiempo detenido
-      if (!this.opponent.timeStopped) {
-        this.opponent.update(cursorsP2, wasdP2, spaceBarP2, xKeyP2, qKeyP2);
-      }
+      this.opponent.update(cursorsP2, wasdP2, spaceBarP2, xKeyP2, qKeyP2);
     } else {
       // Modo contra IA
-      if (!this.opponent.timeStopped) {
-        const aiInputs = this.opponentAI.getInputs();
-        this.opponent.update(...aiInputs);
-      }
+      const aiInputs = this.opponentAI.getInputs();
+      this.opponent.update(...aiInputs);
     }
 
     // Verificar colisión de Colombia Ball en modo energy ball

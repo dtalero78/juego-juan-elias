@@ -2,6 +2,8 @@ import Phaser from 'phaser';
 import Dolphin from '../entities/Dolphin.js';
 import ColombiaBall from '../entities/ColombiaBall.js';
 import RedTriangle from '../entities/RedTriangle.js';
+import Clon from '../entities/Clon.js';
+import Torbellino from '../entities/Torbellino.js';
 import Bullet from '../entities/Bullet.js';
 import IceBoss from '../entities/IceBoss.js';
 import Snowball from '../entities/Snowball.js';
@@ -56,6 +58,9 @@ export default class IceBossScene extends Phaser.Scene {
     } else if (this.selectedCharacter === 'redTriangle') {
       this.player = new RedTriangle(this, 100, 550);
       this.dolphin = this.player;
+    } else if (this.selectedCharacter === 'clon') {
+      this.player = new Clon(this, 100, 550);
+      this.dolphin = this.player;
     } else {
       this.player = new Dolphin(this, 100, 550, this.selectedBullets);
       this.dolphin = this.player;
@@ -73,6 +78,12 @@ export default class IceBossScene extends Phaser.Scene {
 
     this.snowballs = this.physics.add.group({
       classType: Snowball,
+      runChildUpdate: true
+    });
+
+    // Grupo de torbellinos (Clon)
+    this.torbellinos = this.physics.add.group({
+      classType: Torbellino,
       runChildUpdate: true
     });
 
@@ -110,8 +121,16 @@ export default class IceBossScene extends Phaser.Scene {
     this.events.on('triangleShield', () => this.soundGen.play('pickup'), this);
     this.events.on('triangleFireball', this.createBigFireball, this);
 
+    // Eventos para Clon
+    this.events.on('clonJump', () => this.soundGen.play('jump'), this);
+    this.events.on('clonDash', () => this.soundGen.play('dash'), this);
+    this.events.on('clonShoot', (x, y, flipX) => {
+      this.createTorbellino(x, y, flipX);
+    }, this);
+
     // Colisiones
     this.physics.add.overlap(this.iceBoss, this.bullets, this.hitIceBoss, null, this);
+    this.physics.add.overlap(this.iceBoss, this.torbellinos, this.hitIceBossWithTorbellino, null, this);
     this.physics.add.overlap(this.dolphin, this.snowballs, this.hitDolphinWithSnowball, null, this);
     this.physics.add.overlap(this.dolphin, this.iceBoss, this.hitDolphinWithBoss, null, this);
     this.physics.add.collider(this.dolphin, this.ground);
@@ -126,7 +145,7 @@ export default class IceBossScene extends Phaser.Scene {
       if (!this.gameOver && !this.gameWon) {
         if (this.selectedCharacter === 'redTriangle') {
           this.player.activateShield();
-        } else if (this.selectedCharacter !== 'colombiaBall') {
+        } else if (this.selectedCharacter !== 'colombiaBall' && this.selectedCharacter !== 'clon') {
           this.dolphin.nextBulletType();
           this.updateAmmoUI();
         }
@@ -604,8 +623,8 @@ export default class IceBossScene extends Phaser.Scene {
     const smallFontSize = this.isMobileDevice ? '12px' : '16px';
 
     // Vida del personaje
-    const maxHealth = this.selectedCharacter === 'colombiaBall' ? 4 : 3;
-    const healthColor = this.selectedCharacter === 'redTriangle' ? '#FF0000' : '#006400';
+    const maxHealth = (this.selectedCharacter === 'colombiaBall' || this.selectedCharacter === 'clon') ? 4 : 3;
+    const healthColor = this.selectedCharacter === 'redTriangle' ? '#FF0000' : (this.selectedCharacter === 'clon' ? '#00FF00' : '#006400');
     this.dolphinHealthText = this.add.text(10, 10, `Vida: ${maxHealth}/${maxHealth}`, {
       fontSize: fontSize,
       fill: healthColor,
@@ -627,6 +646,14 @@ export default class IceBossScene extends Phaser.Scene {
       this.ammoText = this.add.text(10, 35, 'Fuego: ∞ | Q: Escudo', {
         fontSize: smallFontSize,
         fill: '#FF4500',
+        fontFamily: 'Courier New',
+        backgroundColor: '#000000aa',
+        padding: { x: 5, y: 2 }
+      });
+    } else if (this.selectedCharacter === 'clon') {
+      this.ammoText = this.add.text(10, 35, 'Torbellino: ∞ | X: Dash', {
+        fontSize: smallFontSize,
+        fill: '#00FF00',
         fontFamily: 'Courier New',
         backgroundColor: '#000000aa',
         padding: { x: 5, y: 2 }
@@ -927,7 +954,7 @@ export default class IceBossScene extends Phaser.Scene {
 
     this.soundGen.play('hurt');
     const health = this.dolphin.takeDamage();
-    const maxHealth = this.selectedCharacter === 'colombiaBall' ? 4 : 3;
+    const maxHealth = (this.selectedCharacter === 'colombiaBall' || this.selectedCharacter === 'clon') ? 4 : 3;
 
     if (this.dolphinHealthText) {
       this.dolphinHealthText.setText(`Vida: ${health}/${maxHealth}`);
@@ -1003,6 +1030,9 @@ export default class IceBossScene extends Phaser.Scene {
       return;
     }
 
+    // Clon no tiene munición variable
+    if (this.selectedCharacter === 'clon') return;
+
     const ammo = this.dolphin.ammo;
     const currentType = this.dolphin.bulletType;
     const typeNames = {
@@ -1066,8 +1096,8 @@ export default class IceBossScene extends Phaser.Scene {
   collectPowerup(dolphin, powerup) {
     if (!powerup.active) return;
 
-    // Colombia Ball y RedTriangle no usan munición, los powerups les dan vida
-    if (this.selectedCharacter === 'colombiaBall' || this.selectedCharacter === 'redTriangle') {
+    // Colombia Ball, RedTriangle y Clon no usan munición, los powerups les dan vida
+    if (this.selectedCharacter === 'colombiaBall' || this.selectedCharacter === 'redTriangle' || this.selectedCharacter === 'clon') {
       if (dolphin.health < dolphin.maxHealth) {
         dolphin.health++;
         this.soundGen.play('pickup');
@@ -1150,6 +1180,38 @@ export default class IceBossScene extends Phaser.Scene {
       if (this.healthText && this.iceBoss.active) {
         this.healthText.setText(`Ice Boss: ${this.iceBoss.health}`);
       }
+    }
+  }
+
+  // Crear torbellino de Clon
+  createTorbellino(x, y, flipX) {
+    if (this.gameOver || this.gameWon) return;
+
+    const torb = this.torbellinos.get(x, y);
+    if (torb) {
+      torb.fire(x, y, flipX ? -1 : 1);
+    }
+    this.soundGen.play('shoot');
+  }
+
+  // Torbellino golpea al Ice Boss
+  hitIceBossWithTorbellino(boss, torbellino) {
+    if (!torbellino.active || !boss.active) return;
+
+    torbellino.setActive(false);
+    torbellino.setVisible(false);
+    torbellino.body.stop();
+    this.tweens.killTweensOf(torbellino);
+
+    this.soundGen.play('hit');
+
+    // El torbellino hace 3 de daño
+    for (let i = 0; i < 3; i++) {
+      if (boss.active) boss.takeDamage();
+    }
+
+    if (this.healthText && boss.active) {
+      this.healthText.setText(`Ice Boss: ${boss.health}`);
     }
   }
 
