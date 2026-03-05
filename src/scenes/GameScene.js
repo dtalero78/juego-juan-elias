@@ -3,6 +3,7 @@ import Dolphin from '../entities/Dolphin.js';
 import ColombiaBall from '../entities/ColombiaBall.js';
 import RedTriangle from '../entities/RedTriangle.js';
 import Clon from '../entities/Clon.js';
+import Perrito from '../entities/Perrito.js';
 import Torbellino from '../entities/Torbellino.js';
 import Bullet from '../entities/Bullet.js';
 import Octopus from '../entities/Octopus.js';
@@ -58,6 +59,9 @@ export default class GameScene extends Phaser.Scene {
     } else if (this.selectedCharacter === 'clon') {
       this.player = new Clon(this, 100, 550);
       this.dolphin = this.player;
+    } else if (this.selectedCharacter === 'perrito') {
+      this.player = new Perrito(this, 100, 550);
+      this.dolphin = this.player;
     } else {
       this.player = new Dolphin(this, 100, 550, this.selectedBullets);
       this.dolphin = this.player;
@@ -82,6 +86,9 @@ export default class GameScene extends Phaser.Scene {
       classType: Torbellino,
       runChildUpdate: true
     });
+
+    // Bolas magnéticas (Perrito)
+    this.magnetBalls = [];
 
     // Controles
     this.cursors = this.input.keyboard.createCursorKeys();
@@ -122,6 +129,11 @@ export default class GameScene extends Phaser.Scene {
     this.events.on('clonShoot', (x, y, flipX) => {
       this.createTorbellino(x, y, flipX);
     }, this);
+
+    // Eventos para Perrito
+    this.events.on('perritoJump', () => this.soundGen.play('jump'), this);
+    this.events.on('perritoDash', () => this.soundGen.play('dash'), this);
+    this.events.on('perritoMagnet', this.createMagnetBall, this);
 
     // Colisiones
     this.physics.add.overlap(
@@ -170,7 +182,7 @@ export default class GameScene extends Phaser.Scene {
         if (this.selectedCharacter === 'redTriangle') {
           // Activar escudo de tarjetas
           this.dolphin.activateShield();
-        } else if (this.selectedCharacter !== 'colombiaBall' && this.selectedCharacter !== 'clon') {
+        } else if (this.selectedCharacter !== 'colombiaBall' && this.selectedCharacter !== 'clon' && this.selectedCharacter !== 'perrito') {
           this.dolphin.nextBulletType();
           this.updateAmmoUI();
         }
@@ -239,6 +251,7 @@ export default class GameScene extends Phaser.Scene {
     if (this.selectedCharacter === 'colombiaBall') maxHealth = 4;
     else if (this.selectedCharacter === 'redTriangle') maxHealth = 3;
     else if (this.selectedCharacter === 'clon') maxHealth = 4;
+    else if (this.selectedCharacter === 'perrito') maxHealth = 4;
 
     this.dolphinHealthText = this.add.text(10, 10, `Vida: ${maxHealth}/${maxHealth}`, {
       fontSize: fontSize,
@@ -269,6 +282,14 @@ export default class GameScene extends Phaser.Scene {
       this.ammoText = this.add.text(10, 35, 'Torbellino: ∞ | X: Dash', {
         fontSize: smallFontSize,
         fill: '#00FF00',
+        fontFamily: 'Courier New',
+        backgroundColor: '#000000aa',
+        padding: { x: 5, y: 2 }
+      });
+    } else if (this.selectedCharacter === 'perrito') {
+      this.ammoText = this.add.text(10, 35, 'ESPACIO: Bola Magnética | X: Dash', {
+        fontSize: smallFontSize,
+        fill: '#FF00FF',
         fontFamily: 'Courier New',
         backgroundColor: '#000000aa',
         padding: { x: 5, y: 2 }
@@ -760,8 +781,22 @@ export default class GameScene extends Phaser.Scene {
     });
   }
 
-  hitDolphin() {
+  hitDolphin(player, bullet) {
     if (!this.gameOver && this.dolphin) {
+      // Escudo del Triángulo Rojo: refleja el proyectil
+      if (this.selectedCharacter === 'redTriangle' && this.dolphin.shieldActive) {
+        if (bullet) {
+          bullet.setActive(false);
+          bullet.setVisible(false);
+          if (bullet.body) bullet.body.allowGravity = false;
+        }
+        const cardIndex = this.dolphin.shieldCards.findIndex(c => c.active);
+        if (cardIndex >= 0) this.dolphin.blockAttack(cardIndex);
+        this.createReflectedFireball();
+        this.soundGen.play('hit');
+        return;
+      }
+
       // Sonido de daño
       this.soundGen.play('hurt');
 
@@ -828,6 +863,10 @@ export default class GameScene extends Phaser.Scene {
     this.gameWon = true;
     this.physics.pause();
     this.soundGen.play('victory');
+
+    // +100 placas de metal por ganar
+    const plates = parseInt(localStorage.getItem('mielito_plates') || '0', 10);
+    localStorage.setItem('mielito_plates', String(plates + 100));
 
     // Ocultar controles táctiles
     if (this.touchControls) {
@@ -1171,6 +1210,121 @@ export default class GameScene extends Phaser.Scene {
   }
 
   // Crear torbellino de Clon
+  createMagnetBall(x, y, flipX) {
+    if (this.gameOver || this.gameWon) return;
+
+    const color = (this.dolphin && this.dolphin.magnetColor) ? this.dolphin.magnetColor : 0xFF00FF;
+    const dir = flipX ? -1 : 1;
+    const startX = x + dir * 30;
+
+    const magnet = this.physics.add.image(startX, y, 'magnetBall');
+    magnet.setScale(1.4);
+    magnet.body.allowGravity = false;
+    magnet.setVelocityX(280 * dir);
+    if (color !== 0xFF00FF) magnet.setTint(color);
+
+    // Pulso visual
+    this.tweens.add({
+      targets: magnet,
+      scale: 1.9,
+      duration: 350,
+      yoyo: true,
+      repeat: -1
+    });
+
+    const entry = { sprite: magnet, createTime: this.time.now };
+    this.magnetBalls.push(entry);
+
+    // Tras 0.5s: detener y activar atracción
+    this.time.delayedCall(500, () => {
+      if (!magnet.active) return;
+      magnet.setVelocity(0, 0);
+      magnet.body.allowGravity = false;
+
+      // Aro visual de campo magnético
+      const ring = this.add.circle(magnet.x, magnet.y, 150, color, 0.08);
+      this.tweens.add({
+        targets: ring,
+        alpha: 0,
+        duration: 3500,
+        onComplete: () => ring.destroy()
+      });
+    });
+
+    // Tras 4s: explotar
+    this.time.delayedCall(4000, () => {
+      if (!magnet.active) return;
+
+      // Daño al boss si está cerca
+      if (this.octopus && this.octopus.active) {
+        const dist = Phaser.Math.Distance.Between(magnet.x, magnet.y, this.octopus.x, this.octopus.y);
+        if (dist < 160) {
+          for (let i = 0; i < 12; i++) {
+            if (this.octopus.active) this.octopus.takeDamage();
+          }
+          if (this.healthText && this.octopus.active) {
+            this.healthText.setText(`Villano: ${this.octopus.health}`);
+          }
+        }
+      }
+
+      // Explosión visual
+      for (let i = 0; i < 16; i++) {
+        const angle = (i / 16) * Math.PI * 2;
+        const p = this.add.circle(
+          magnet.x + Math.cos(angle) * 8,
+          magnet.y + Math.sin(angle) * 8,
+          Phaser.Math.Between(5, 13),
+          color
+        );
+        this.tweens.add({
+          targets: p,
+          x: magnet.x + Math.cos(angle) * 90,
+          y: magnet.y + Math.sin(angle) * 90,
+          alpha: 0,
+          duration: 600,
+          ease: 'Cubic.easeOut',
+          onComplete: () => p.destroy()
+        });
+      }
+
+      // Quitar del array
+      const idx = this.magnetBalls.indexOf(entry);
+      if (idx !== -1) this.magnetBalls.splice(idx, 1);
+
+      magnet.destroy();
+      this.soundGen.play('explosion');
+    });
+
+    this.soundGen.play('pickup');
+  }
+
+  updateMagnetBalls() {
+    if (!this.magnetBalls || this.magnetBalls.length === 0) return;
+
+    this.magnetBalls.forEach(m => {
+      if (!m.sprite || !m.sprite.active) return;
+      const elapsed = this.time.now - m.createTime;
+      if (elapsed < 500) return; // Todavía en vuelo
+
+      // Atraer balas del pulpo
+      this.octopusBullets.getChildren().forEach(bullet => {
+        if (!bullet.active) return;
+        const dist = Phaser.Math.Distance.Between(bullet.x, bullet.y, m.sprite.x, m.sprite.y);
+        if (dist < 180) {
+          if (dist < 22) {
+            bullet.setActive(false);
+            bullet.setVisible(false);
+            if (bullet.body) bullet.body.stop();
+          } else {
+            const angle = Phaser.Math.Angle.Between(bullet.x, bullet.y, m.sprite.x, m.sprite.y);
+            bullet.setVelocity(Math.cos(angle) * 320, Math.sin(angle) * 320);
+          }
+        }
+      });
+    });
+  }
+
   createTorbellino(x, y, flipX) {
     if (!this.gameOver && !this.gameWon) {
       const torb = this.torbellinos.get(x, y);
@@ -1202,6 +1356,25 @@ export default class GameScene extends Phaser.Scene {
     }
   }
 
+  // Fireball reflejada por el escudo del Triángulo
+  createReflectedFireball() {
+    if (!this.octopus || !this.octopus.active || !this.dolphin) return;
+    const dir = this.octopus.x > this.dolphin.x ? 1 : -1;
+    const bullet = this.bullets.get(this.dolphin.x, this.dolphin.y, 'bigFireball');
+    if (bullet) {
+      bullet.setActive(true);
+      bullet.setVisible(true);
+      bullet.body.reset(this.dolphin.x, this.dolphin.y);
+      bullet.setVelocityX(550 * dir);
+      bullet.body.allowGravity = false;
+      bullet.damage = 10;
+      bullet.bulletType = 'bigFireball';
+      bullet.setScale(1.2);
+      bullet.setTint(0xFFFF00);
+      this.time.delayedCall(200, () => { if (bullet.active) bullet.clearTint(); });
+    }
+  }
+
   // Crear bola de fuego grande de Red Triangle
   createBigFireball(x, y, flipX) {
     if (!this.octopus || !this.octopus.active) return;
@@ -1214,6 +1387,7 @@ export default class GameScene extends Phaser.Scene {
 
       const direction = flipX ? -1 : 1;
       bullet.setVelocityX(350 * direction);
+      bullet.body.allowGravity = false;
       bullet.damage = 8; // Más daño que otras balas
       bullet.bulletType = 'bigFireball';
       bullet.setScale(1.3);
@@ -1287,6 +1461,8 @@ export default class GameScene extends Phaser.Scene {
       this.updateOctopusBullets();
       // Actualizar balas de teletransporte
       this.updateTeleportBullets();
+      // Actualizar bolas magnéticas de Perrito
+      this.updateMagnetBalls();
     }
   }
 

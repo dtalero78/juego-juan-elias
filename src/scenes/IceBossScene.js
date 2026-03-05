@@ -3,6 +3,7 @@ import Dolphin from '../entities/Dolphin.js';
 import ColombiaBall from '../entities/ColombiaBall.js';
 import RedTriangle from '../entities/RedTriangle.js';
 import Clon from '../entities/Clon.js';
+import Perrito from '../entities/Perrito.js';
 import Torbellino from '../entities/Torbellino.js';
 import Bullet from '../entities/Bullet.js';
 import IceBoss from '../entities/IceBoss.js';
@@ -61,6 +62,9 @@ export default class IceBossScene extends Phaser.Scene {
     } else if (this.selectedCharacter === 'clon') {
       this.player = new Clon(this, 100, 550);
       this.dolphin = this.player;
+    } else if (this.selectedCharacter === 'perrito') {
+      this.player = new Perrito(this, 100, 550);
+      this.dolphin = this.player;
     } else {
       this.player = new Dolphin(this, 100, 550, this.selectedBullets);
       this.dolphin = this.player;
@@ -86,6 +90,9 @@ export default class IceBossScene extends Phaser.Scene {
       classType: Torbellino,
       runChildUpdate: true
     });
+
+    // Bolas magnéticas (Perrito)
+    this.magnetBalls = [];
 
     // Controles
     this.cursors = this.input.keyboard.createCursorKeys();
@@ -128,6 +135,11 @@ export default class IceBossScene extends Phaser.Scene {
       this.createTorbellino(x, y, flipX);
     }, this);
 
+    // Eventos para Perrito
+    this.events.on('perritoJump', () => this.soundGen.play('jump'), this);
+    this.events.on('perritoDash', () => this.soundGen.play('dash'), this);
+    this.events.on('perritoMagnet', this.createMagnetBall, this);
+
     // Colisiones
     this.physics.add.overlap(this.iceBoss, this.bullets, this.hitIceBoss, null, this);
     this.physics.add.overlap(this.iceBoss, this.torbellinos, this.hitIceBossWithTorbellino, null, this);
@@ -145,7 +157,7 @@ export default class IceBossScene extends Phaser.Scene {
       if (!this.gameOver && !this.gameWon) {
         if (this.selectedCharacter === 'redTriangle') {
           this.player.activateShield();
-        } else if (this.selectedCharacter !== 'colombiaBall' && this.selectedCharacter !== 'clon') {
+        } else if (this.selectedCharacter !== 'colombiaBall' && this.selectedCharacter !== 'clon' && this.selectedCharacter !== 'perrito') {
           this.dolphin.nextBulletType();
           this.updateAmmoUI();
         }
@@ -179,10 +191,10 @@ export default class IceBossScene extends Phaser.Scene {
 
   // Crear fondo invernal con montañas y cielo
   createWinterBackground() {
-    // Degradado de cielo invernal
-    const skyGradient = this.add.graphics();
-    skyGradient.fillGradientStyle(0x1a237e, 0x1a237e, 0x4fc3f7, 0x4fc3f7, 1);
-    skyGradient.fillRect(0, 0, 800, 650);
+    // Imagen de fondo
+    const bg = this.add.image(400, 325, 'fondoIceBoss');
+    bg.setDisplaySize(800, 650);
+    bg.setDepth(0);
 
     // Montañas de fondo (lejanas - más claras)
     const farMountains = this.add.graphics();
@@ -623,7 +635,7 @@ export default class IceBossScene extends Phaser.Scene {
     const smallFontSize = this.isMobileDevice ? '12px' : '16px';
 
     // Vida del personaje
-    const maxHealth = (this.selectedCharacter === 'colombiaBall' || this.selectedCharacter === 'clon') ? 4 : 3;
+    const maxHealth = (this.selectedCharacter === 'colombiaBall' || this.selectedCharacter === 'clon' || this.selectedCharacter === 'perrito') ? 4 : 3;
     const healthColor = this.selectedCharacter === 'redTriangle' ? '#FF0000' : (this.selectedCharacter === 'clon' ? '#00FF00' : '#006400');
     this.dolphinHealthText = this.add.text(10, 10, `Vida: ${maxHealth}/${maxHealth}`, {
       fontSize: fontSize,
@@ -654,6 +666,14 @@ export default class IceBossScene extends Phaser.Scene {
       this.ammoText = this.add.text(10, 35, 'Torbellino: ∞ | X: Dash', {
         fontSize: smallFontSize,
         fill: '#00FF00',
+        fontFamily: 'Courier New',
+        backgroundColor: '#000000aa',
+        padding: { x: 5, y: 2 }
+      });
+    } else if (this.selectedCharacter === 'perrito') {
+      this.ammoText = this.add.text(10, 35, 'ESPACIO: Bola Magnética | X: Dash', {
+        fontSize: smallFontSize,
+        fill: '#FF00FF',
         fontFamily: 'Courier New',
         backgroundColor: '#000000aa',
         padding: { x: 5, y: 2 }
@@ -909,6 +929,18 @@ export default class IceBossScene extends Phaser.Scene {
   hitDolphinWithSnowball(dolphin, snowball) {
     if (!snowball.active || this.gameOver) return;
 
+    // Escudo del Triángulo Rojo: refleja la bola de nieve
+    if (this.selectedCharacter === 'redTriangle' && this.dolphin.shieldActive) {
+      snowball.setActive(false);
+      snowball.setVisible(false);
+      this.tweens.killTweensOf(snowball);
+      const cardIndex = this.dolphin.shieldCards.findIndex(c => c.active);
+      if (cardIndex >= 0) this.dolphin.blockAttack(cardIndex);
+      this.createReflectedFireball();
+      this.soundGen.play('hit');
+      return;
+    }
+
     snowball.setActive(false);
     snowball.setVisible(false);
     this.tweens.killTweensOf(snowball);
@@ -954,7 +986,7 @@ export default class IceBossScene extends Phaser.Scene {
 
     this.soundGen.play('hurt');
     const health = this.dolphin.takeDamage();
-    const maxHealth = (this.selectedCharacter === 'colombiaBall' || this.selectedCharacter === 'clon') ? 4 : 3;
+    const maxHealth = (this.selectedCharacter === 'colombiaBall' || this.selectedCharacter === 'clon' || this.selectedCharacter === 'perrito') ? 4 : 3;
 
     if (this.dolphinHealthText) {
       this.dolphinHealthText.setText(`Vida: ${health}/${maxHealth}`);
@@ -1000,6 +1032,10 @@ export default class IceBossScene extends Phaser.Scene {
     this.gameWon = true;
     this.physics.pause();
     this.soundGen.play('victory');
+
+    // +100 placas de metal por ganar
+    const plates = parseInt(localStorage.getItem('mielito_plates') || '0', 10);
+    localStorage.setItem('mielito_plates', String(plates + 100));
 
     if (this.touchControls) this.touchControls.destroy();
 
@@ -1184,6 +1220,111 @@ export default class IceBossScene extends Phaser.Scene {
   }
 
   // Crear torbellino de Clon
+  createMagnetBall(x, y, flipX) {
+    if (this.gameOver || this.gameWon) return;
+
+    const color = (this.dolphin && this.dolphin.magnetColor) ? this.dolphin.magnetColor : 0xFF00FF;
+    const dir = flipX ? -1 : 1;
+    const startX = x + dir * 30;
+
+    const magnet = this.physics.add.image(startX, y, 'magnetBall');
+    magnet.setScale(1.4);
+    magnet.body.allowGravity = false;
+    magnet.setVelocityX(280 * dir);
+    if (color !== 0xFF00FF) magnet.setTint(color);
+
+    this.tweens.add({
+      targets: magnet,
+      scale: 1.9,
+      duration: 350,
+      yoyo: true,
+      repeat: -1
+    });
+
+    const entry = { sprite: magnet, createTime: this.time.now };
+    this.magnetBalls.push(entry);
+
+    this.time.delayedCall(500, () => {
+      if (!magnet.active) return;
+      magnet.setVelocity(0, 0);
+      magnet.body.allowGravity = false;
+      const ring = this.add.circle(magnet.x, magnet.y, 150, color, 0.08);
+      this.tweens.add({
+        targets: ring,
+        alpha: 0,
+        duration: 3500,
+        onComplete: () => ring.destroy()
+      });
+    });
+
+    this.time.delayedCall(4000, () => {
+      if (!magnet.active) return;
+
+      if (this.iceBoss && this.iceBoss.active) {
+        const dist = Phaser.Math.Distance.Between(magnet.x, magnet.y, this.iceBoss.x, this.iceBoss.y);
+        if (dist < 160) {
+          for (let i = 0; i < 12; i++) {
+            if (this.iceBoss.active) this.iceBoss.takeDamage();
+          }
+          if (this.healthText && this.iceBoss.active) {
+            this.healthText.setText(`Ice Boss: ${this.iceBoss.health}`);
+          }
+        }
+      }
+
+      for (let i = 0; i < 16; i++) {
+        const angle = (i / 16) * Math.PI * 2;
+        const p = this.add.circle(
+          magnet.x + Math.cos(angle) * 8,
+          magnet.y + Math.sin(angle) * 8,
+          Phaser.Math.Between(5, 13),
+          color
+        );
+        this.tweens.add({
+          targets: p,
+          x: magnet.x + Math.cos(angle) * 90,
+          y: magnet.y + Math.sin(angle) * 90,
+          alpha: 0,
+          duration: 600,
+          ease: 'Cubic.easeOut',
+          onComplete: () => p.destroy()
+        });
+      }
+
+      const idx = this.magnetBalls.indexOf(entry);
+      if (idx !== -1) this.magnetBalls.splice(idx, 1);
+      magnet.destroy();
+      this.soundGen.play('explosion');
+    });
+
+    this.soundGen.play('pickup');
+  }
+
+  updateMagnetBalls() {
+    if (!this.magnetBalls || this.magnetBalls.length === 0) return;
+
+    this.magnetBalls.forEach(m => {
+      if (!m.sprite || !m.sprite.active) return;
+      if (this.time.now - m.createTime < 500) return;
+
+      // Atraer bolas de nieve del Ice Boss
+      this.snowballs.getChildren().forEach(snowball => {
+        if (!snowball.active) return;
+        const dist = Phaser.Math.Distance.Between(snowball.x, snowball.y, m.sprite.x, m.sprite.y);
+        if (dist < 180) {
+          if (dist < 22) {
+            snowball.setActive(false);
+            snowball.setVisible(false);
+            if (snowball.body) snowball.body.stop();
+          } else {
+            const angle = Phaser.Math.Angle.Between(snowball.x, snowball.y, m.sprite.x, m.sprite.y);
+            snowball.setVelocity(Math.cos(angle) * 320, Math.sin(angle) * 320);
+          }
+        }
+      });
+    });
+  }
+
   createTorbellino(x, y, flipX) {
     if (this.gameOver || this.gameWon) return;
 
@@ -1216,6 +1357,25 @@ export default class IceBossScene extends Phaser.Scene {
   }
 
   // Crear bola de fuego grande de Red Triangle
+  // Fireball reflejada por el escudo del Triángulo
+  createReflectedFireball() {
+    if (!this.iceBoss || !this.iceBoss.active || !this.dolphin) return;
+    const dir = this.iceBoss.x > this.dolphin.x ? 1 : -1;
+    const bullet = this.bullets.get(this.dolphin.x, this.dolphin.y, 'bigFireball');
+    if (bullet) {
+      bullet.setActive(true);
+      bullet.setVisible(true);
+      bullet.body.reset(this.dolphin.x, this.dolphin.y);
+      bullet.setVelocityX(550 * dir);
+      bullet.body.allowGravity = false;
+      bullet.damage = 12;
+      bullet.bulletType = 'bigFireball';
+      bullet.setScale(1.2);
+      bullet.setTint(0xFFFF00);
+      this.time.delayedCall(200, () => { if (bullet.active) bullet.clearTint(); });
+    }
+  }
+
   createBigFireball(x, y, flipX) {
     if (!this.iceBoss || !this.iceBoss.active) return;
 
@@ -1227,6 +1387,7 @@ export default class IceBossScene extends Phaser.Scene {
 
       const direction = flipX ? -1 : 1;
       bullet.setVelocityX(380 * direction);
+      bullet.body.allowGravity = false;
       bullet.damage = 10; // Muy efectivo contra hielo
       bullet.bulletType = 'bigFireball';
       bullet.setScale(1.5);
@@ -1345,6 +1506,9 @@ export default class IceBossScene extends Phaser.Scene {
 
       // Actualizar nieve
       this.updateSnowEffect();
+
+      // Actualizar bolas magnéticas de Perrito
+      this.updateMagnetBalls();
 
       // Limpiar snowballs fuera de pantalla
       this.snowballs.getChildren().forEach(snowball => {

@@ -33,6 +33,10 @@ export default class CharacterAI {
       this.optimalDistance = 220; // Mid-long range
       this.attackDistance = 350;
       this.aggressiveness = 0.65;
+    } else if (charType === 'Perrito') {
+      this.optimalDistance = 180; // Medium range (magnet ball mid-range)
+      this.attackDistance = 250;
+      this.aggressiveness = 0.55;
     } else { // Dolphin
       this.optimalDistance = 250; // Long range
       this.attackDistance = 400;

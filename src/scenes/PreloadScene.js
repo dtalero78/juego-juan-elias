@@ -24,6 +24,20 @@ export default class PreloadScene extends Phaser.Scene {
     // Imagen del personaje para el menú
     this.load.image('personaje', 'assets/personaje.png');
 
+    // Fondo IceBoss
+    this.load.image('fondoIceBoss', 'assets/fondo.png');
+
+    // Fondos PvP
+    this.load.image('fondoPvpNaranja', 'assets/fondo.png');
+    this.load.image('fondoPvpGris', 'assets/fondo_grey.png');
+
+    // Skin robot de Clon
+    this.load.image('clon_robot', 'assets/clon_robot.png');
+
+    // Perrito
+    this.load.image('perrito', 'assets/perrito.png');
+    this.load.image('perrito_tierra', 'assets/perrito_tierra.png');
+
     // Crear sprites placeholder con gráficos generados
     this.createPlaceholderAssets();
   }
@@ -456,6 +470,22 @@ export default class PreloadScene extends Phaser.Scene {
     cardGraphics.fillTriangle(10, 22, 6, 15, 14, 15); // Triángulo abajo
     cardGraphics.generateTexture('blockCard', 20, 30);
     cardGraphics.destroy();
+
+    // Bola magnética de Perrito
+    const magnetG = this.add.graphics();
+    magnetG.fillStyle(0x9900CC, 1);
+    magnetG.fillCircle(12, 12, 12);
+    magnetG.fillStyle(0xFF00FF, 1);
+    magnetG.fillCircle(10, 10, 8);
+    magnetG.fillStyle(0xFFFFFF, 1);
+    magnetG.fillCircle(8, 8, 3);
+    // Polos del imán
+    magnetG.fillStyle(0xFF3399, 1);
+    magnetG.fillRect(5, 10, 5, 5);
+    magnetG.fillStyle(0x6600AA, 1);
+    magnetG.fillRect(14, 10, 5, 5);
+    magnetG.generateTexture('magnetBall', 24, 24);
+    magnetG.destroy();
 
   }
 

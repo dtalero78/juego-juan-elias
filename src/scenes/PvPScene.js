@@ -3,6 +3,7 @@ import Dolphin from '../entities/Dolphin.js';
 import ColombiaBall from '../entities/ColombiaBall.js';
 import RedTriangle from '../entities/RedTriangle.js';
 import Clon from '../entities/Clon.js';
+import Perrito from '../entities/Perrito.js';
 import Bullet from '../entities/Bullet.js';
 import Torbellino from '../entities/Torbellino.js';
 import Platform from '../entities/Platform.js';
@@ -21,6 +22,7 @@ export default class PvPScene extends Phaser.Scene {
     this.touchControlsPlayer2 = null;
     this.isMobileDevice = isMobile;
     this.isLocalMultiplayer = false; // Si es false, juega contra IA
+    this.pvpBackground = 'fondoPvpNaranja';
   }
 
   init(data) {
@@ -33,6 +35,7 @@ export default class PvPScene extends Phaser.Scene {
     if (data && data.isLocalMultiplayer !== undefined) {
       this.isLocalMultiplayer = data.isLocalMultiplayer;
     }
+    this.pvpBackground = (data && data.pvpBackground) ? data.pvpBackground : 'fondoPvpNaranja';
   }
 
   create() {
@@ -44,7 +47,7 @@ export default class PvPScene extends Phaser.Scene {
     this.soundGen.init();
 
     // Fondo
-    this.cameras.main.setBackgroundColor('#87CEEB');
+    this.add.image(400, 325, this.pvpBackground).setDisplaySize(800, 650);
 
     // Crear arena
     this.createArena();
@@ -138,6 +141,8 @@ export default class PvPScene extends Phaser.Scene {
     } else if (type === 'clon') {
       // Clon en modo PvP
       character = new Clon(this, x, y, true);
+    } else if (type === 'perrito') {
+      character = new Perrito(this, x, y, true);
     } else {
       // Dolphin en modo PvP
       character = new Dolphin(this, x, y, ['normal', 'fire'], true);
@@ -307,6 +312,16 @@ export default class PvPScene extends Phaser.Scene {
     this.events.on('dolphinDash', () => this.soundGen.play('dash'));
     this.events.on('clonJump', () => this.soundGen.play('jump'));
     this.events.on('clonDash', () => this.soundGen.play('dash'));
+    this.events.on('perritoJump', () => this.soundGen.play('jump'));
+    this.events.on('perritoDash', () => this.soundGen.play('dash'));
+
+    // Perrito - bola magnética
+    this.playerMagnetBalls = [];
+    this.opponentMagnetBalls = [];
+    this.events.on('perritoMagnet', (x, y, flipX, character) => {
+      const isPlayer = (character === this.player || character?.isPlayer1);
+      this.createMagnetBall(x, y, flipX, isPlayer);
+    });
     this.events.on('colombiaJump', () => this.soundGen.play('jump'));
     this.events.on('colombiaDash', () => this.soundGen.play('dash'));
     this.events.on('colombiaPunch', () => this.soundGen.play('hit'));
@@ -529,6 +544,12 @@ export default class PvPScene extends Phaser.Scene {
     this.gameOver = true;
     this.winner = playerWon ? 'player' : 'opponent';
 
+    // +100 placas de metal si el jugador gana
+    if (playerWon) {
+      const plates = parseInt(localStorage.getItem('mielito_plates') || '0', 10);
+      localStorage.setItem('mielito_plates', String(plates + 100));
+    }
+
     // Detener personajes
     this.player.setVelocity(0, 0);
     this.opponent.setVelocity(0, 0);
@@ -668,6 +689,118 @@ export default class PvPScene extends Phaser.Scene {
     this.platforms.forEach(platform => {
       if (platform.update) platform.update();
     });
+
+    // Actualizar bolas magnéticas de Perrito
+    this.updateMagnetBalls();
+  }
+
+  createMagnetBall(x, y, flipX, isPlayer) {
+    if (this.gameOver) return;
+
+    const char = isPlayer ? this.player : this.opponent;
+    const color = (char && char.magnetColor) ? char.magnetColor : 0xFF00FF;
+    const dir = flipX ? -1 : 1;
+    const magnet = this.physics.add.image(x + dir * 30, y, 'magnetBall');
+    magnet.setScale(1.4);
+    magnet.body.allowGravity = false;
+    magnet.setVelocityX(280 * dir);
+    if (color !== 0xFF00FF) magnet.setTint(color);
+
+    this.tweens.add({
+      targets: magnet,
+      scale: 1.9,
+      duration: 350,
+      yoyo: true,
+      repeat: -1
+    });
+
+    const entry = { sprite: magnet, createTime: this.time.now, isPlayer };
+    if (isPlayer) {
+      this.playerMagnetBalls.push(entry);
+    } else {
+      this.opponentMagnetBalls.push(entry);
+    }
+
+    this.time.delayedCall(500, () => {
+      if (!magnet.active) return;
+      magnet.setVelocity(0, 0);
+      magnet.body.allowGravity = false;
+    });
+
+    this.time.delayedCall(4000, () => {
+      if (!magnet.active) return;
+
+      // Daño al oponente si está cerca
+      const target = isPlayer ? this.opponent : this.player;
+      if (target && target.active) {
+        const dist = Phaser.Math.Distance.Between(magnet.x, magnet.y, target.x, target.y);
+        if (dist < 140) {
+          target.takeDamage(15);
+          if (isPlayer) this.updateOpponentHealth(); else this.updatePlayerHealth();
+        }
+      }
+
+      for (let i = 0; i < 14; i++) {
+        const angle = (i / 14) * Math.PI * 2;
+        const p = this.add.circle(
+          magnet.x + Math.cos(angle) * 8,
+          magnet.y + Math.sin(angle) * 8,
+          Phaser.Math.Between(5, 12),
+          color
+        );
+        this.tweens.add({
+          targets: p,
+          x: magnet.x + Math.cos(angle) * 80,
+          y: magnet.y + Math.sin(angle) * 80,
+          alpha: 0,
+          duration: 600,
+          ease: 'Cubic.easeOut',
+          onComplete: () => p.destroy()
+        });
+      }
+
+      if (isPlayer) {
+        const idx = this.playerMagnetBalls.indexOf(entry);
+        if (idx !== -1) this.playerMagnetBalls.splice(idx, 1);
+      } else {
+        const idx = this.opponentMagnetBalls.indexOf(entry);
+        if (idx !== -1) this.opponentMagnetBalls.splice(idx, 1);
+      }
+
+      magnet.destroy();
+      this.soundGen.play('explosion');
+    });
+
+    this.soundGen.play('pickup');
+  }
+
+  updateMagnetBalls() {
+    const attractBullets = (magnets, bulletGroup) => {
+      magnets.forEach(m => {
+        if (!m.sprite || !m.sprite.active) return;
+        if (this.time.now - m.createTime < 500) return;
+
+        bulletGroup.getChildren().forEach(bullet => {
+          if (!bullet.active) return;
+          const dist = Phaser.Math.Distance.Between(bullet.x, bullet.y, m.sprite.x, m.sprite.y);
+          if (dist < 160) {
+            if (dist < 22) {
+              bullet.setActive(false);
+              bullet.setVisible(false);
+              if (bullet.body) bullet.body.stop();
+            } else {
+              const angle = Phaser.Math.Angle.Between(bullet.x, bullet.y, m.sprite.x, m.sprite.y);
+              bullet.setVelocity(Math.cos(angle) * 320, Math.sin(angle) * 320);
+            }
+          }
+        });
+      });
+    };
+
+    // Las bolas del jugador atraen balas del oponente
+    if (this.playerMagnetBalls) attractBullets(this.playerMagnetBalls, this.opponentBullets);
+    // Las del oponente atraen balas del jugador
+    if (this.opponentMagnetBalls) attractBullets(this.opponentMagnetBalls, this.playerBullets);
   }
 
   hitOpponentWithEnergyBall(opponent, energyBall) {
