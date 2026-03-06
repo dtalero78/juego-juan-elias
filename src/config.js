@@ -3,6 +3,8 @@ import PreloadScene from './scenes/PreloadScene.js';
 import MenuScene from './scenes/MenuScene.js';
 import GameScene from './scenes/GameScene.js';
 import IceBossScene from './scenes/IceBossScene.js';
+import FinalBossScene from './scenes/FinalBossScene.js';
+import BlibluBossScene from './scenes/BlibluBossScene.js';
 import PvPScene from './scenes/PvPScene.js';
 
 // Detectar si es dispositivo móvil o tablet
@@ -42,5 +44,5 @@ export const config = {
   input: {
     activePointers: 3 // Permitir múltiples toques simultáneos
   },
-  scene: [PreloadScene, MenuScene, GameScene, IceBossScene, PvPScene]
+  scene: [PreloadScene, MenuScene, GameScene, IceBossScene, FinalBossScene, BlibluBossScene, PvPScene]
 };

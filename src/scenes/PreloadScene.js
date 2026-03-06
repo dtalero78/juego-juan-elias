@@ -38,6 +38,24 @@ export default class PreloadScene extends Phaser.Scene {
     this.load.image('perrito', 'assets/perrito.png');
     this.load.image('perrito_tierra', 'assets/perrito_tierra.png');
 
+    // Pou Chino (Red Triangle)
+    this.load.image('redTriangle', 'assets/pou_chino.png');
+    this.load.image('redTriangle_jump', 'assets/pou_chino.png');
+    this.load.image('redTriangle_shield', 'assets/pou_chino.png');
+
+    // Boss Final
+    this.load.image('finalBoss', 'assets/boss_final.png');
+    this.load.image('finalBossP2', 'assets/boss_final.png');
+
+    // Proyectiles Boss Final
+    this.load.image('spreadBullet', 'assets/hueso.png');
+    this.load.image('bigRay', 'assets/dragon.png');
+
+    // Bliblu Boss
+    this.load.image('bliblu', 'assets/bliblu.png');
+    this.load.image('blibluDash', 'assets/bliblu_dash.png');
+    this.load.image('fondoBliblu', 'assets/fondo.jp2');
+
     // Crear sprites placeholder con gráficos generados
     this.createPlaceholderAssets();
   }
@@ -389,56 +407,7 @@ export default class PreloadScene extends Phaser.Scene {
     energyBallGraphics.generateTexture('energyBall', 24, 24);
     energyBallGraphics.destroy();
 
-    // Red Triangle - Triángulo rojo con ojos
-    const triangleGraphics = this.add.graphics();
-    // Triángulo principal rojo
-    triangleGraphics.fillStyle(0xFF0000, 1);
-    triangleGraphics.fillTriangle(25, 5, 5, 45, 45, 45);
-    // Borde más oscuro
-    triangleGraphics.lineStyle(3, 0x8B0000, 1);
-    triangleGraphics.strokeTriangle(25, 5, 5, 45, 45, 45);
-    // Ojos blancos
-    triangleGraphics.fillStyle(0xFFFFFF, 1);
-    triangleGraphics.fillCircle(18, 28, 6);
-    triangleGraphics.fillCircle(32, 28, 6);
-    // Pupilas negras
-    triangleGraphics.fillStyle(0x000000, 1);
-    triangleGraphics.fillCircle(19, 28, 3);
-    triangleGraphics.fillCircle(33, 28, 3);
-    triangleGraphics.generateTexture('redTriangle', 50, 50);
-    triangleGraphics.destroy();
-
-    // Red Triangle saltando
-    const triangleJumpGraphics = this.add.graphics();
-    triangleJumpGraphics.fillStyle(0xFF0000, 1);
-    triangleJumpGraphics.fillTriangle(25, 5, 5, 45, 45, 45);
-    triangleJumpGraphics.lineStyle(3, 0x8B0000, 1);
-    triangleJumpGraphics.strokeTriangle(25, 5, 5, 45, 45, 45);
-    // Ojos mirando arriba
-    triangleJumpGraphics.fillStyle(0xFFFFFF, 1);
-    triangleJumpGraphics.fillCircle(18, 25, 6);
-    triangleJumpGraphics.fillCircle(32, 25, 6);
-    triangleJumpGraphics.fillStyle(0x000000, 1);
-    triangleJumpGraphics.fillCircle(18, 22, 3);
-    triangleJumpGraphics.fillCircle(32, 22, 3);
-    triangleJumpGraphics.generateTexture('redTriangle_jump', 50, 50);
-    triangleJumpGraphics.destroy();
-
-    // Red Triangle con escudo (tarjetas)
-    const triangleShieldGraphics = this.add.graphics();
-    triangleShieldGraphics.fillStyle(0xFF4500, 1); // Naranja cuando escudo activo
-    triangleShieldGraphics.fillTriangle(25, 5, 5, 45, 45, 45);
-    triangleShieldGraphics.lineStyle(3, 0xFFD700, 1); // Borde dorado
-    triangleShieldGraphics.strokeTriangle(25, 5, 5, 45, 45, 45);
-    // Ojos determinados
-    triangleShieldGraphics.fillStyle(0xFFFFFF, 1);
-    triangleShieldGraphics.fillCircle(18, 28, 6);
-    triangleShieldGraphics.fillCircle(32, 28, 6);
-    triangleShieldGraphics.fillStyle(0xFFD700, 1); // Pupilas doradas
-    triangleShieldGraphics.fillCircle(19, 28, 4);
-    triangleShieldGraphics.fillCircle(33, 28, 4);
-    triangleShieldGraphics.generateTexture('redTriangle_shield', 50, 50);
-    triangleShieldGraphics.destroy();
+    // Red Triangle - cargado desde archivo en preload()
 
     // Bola de fuego grande (ataque del triángulo)
     const bigFireballGraphics = this.add.graphics();
@@ -486,6 +455,7 @@ export default class PreloadScene extends Phaser.Scene {
     magnetG.fillRect(14, 10, 5, 5);
     magnetG.generateTexture('magnetBall', 24, 24);
     magnetG.destroy();
+
 
   }
 

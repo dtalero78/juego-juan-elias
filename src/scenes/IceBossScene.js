@@ -74,6 +74,14 @@ export default class IceBossScene extends Phaser.Scene {
     this.iceBoss = new IceBoss(this, 650, 300);
     this.iceBoss.setTarget(this.dolphin);
 
+    // Dragon del Sol de Oro
+    this.dragonSolEquipped = localStorage.getItem('mielito_dragon_sol_equipped') === 'true'
+      && this.selectedCharacter === 'colombiaBall';
+    this.dragonHits = 0;
+    this.dragonWindowStart = 0;
+    this.dragonAuraActive = false;
+    this.dragonAuraCircle = null;
+
     // Grupos para proyectiles
     this.bullets = this.physics.add.group({
       classType: Bullet,
@@ -105,6 +113,14 @@ export default class IceBossScene extends Phaser.Scene {
     this.spaceBar = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
     this.xKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.X);
     this.qKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.Q);
+
+    // Limpiar solo los eventos del juego para evitar acumulación al reiniciar
+    ['dolphinShoot','iceBossShoot','iceBossDied','dolphinJump','dolphinDash',
+     'colombiaJump','colombiaDash','colombiaPunch','colombiaSpecial','colombiaAttack','colombiaEnergyBall',
+     'triangleJump','triangleDash','triangleShoot','triangleShield','triangleFireball',
+     'clonJump','clonDash','clonShoot',
+     'perritoJump','perritoDash','perritoMagnet','perritoMelee','perritoModeChange'
+    ].forEach(e => this.events.off(e));
 
     // Eventos
     this.events.on('dolphinShoot', this.createBullet, this);
@@ -139,6 +155,18 @@ export default class IceBossScene extends Phaser.Scene {
     this.events.on('perritoJump', () => this.soundGen.play('jump'), this);
     this.events.on('perritoDash', () => this.soundGen.play('dash'), this);
     this.events.on('perritoMagnet', this.createMagnetBall, this);
+    this.events.on('perritoMelee', this.handlePerritoMelee, this);
+    this.events.on('perritoModeChange', (mode) => {
+      if (this.ammoText) {
+        if (mode === 'melee') {
+          this.ammoText.setText('ESPACIO: Golpe | Q: cambiar | X: Dash');
+          this.ammoText.setFill('#FF8800');
+        } else {
+          this.ammoText.setText('ESPACIO: Bola Magnética | Q: cambiar | X: Dash');
+          this.ammoText.setFill('#FF00FF');
+        }
+      }
+    }, this);
 
     // Colisiones
     this.physics.add.overlap(this.iceBoss, this.bullets, this.hitIceBoss, null, this);
@@ -671,7 +699,7 @@ export default class IceBossScene extends Phaser.Scene {
         padding: { x: 5, y: 2 }
       });
     } else if (this.selectedCharacter === 'perrito') {
-      this.ammoText = this.add.text(10, 35, 'ESPACIO: Bola Magnética | X: Dash', {
+      this.ammoText = this.add.text(10, 35, 'ESPACIO: Bola Magnética | Q: cambiar | X: Dash', {
         fontSize: smallFontSize,
         fill: '#FF00FF',
         fontFamily: 'Courier New',
@@ -1196,18 +1224,22 @@ export default class IceBossScene extends Phaser.Scene {
     const distance = Phaser.Math.Distance.Between(attackX, attackY, this.iceBoss.x, this.iceBoss.y);
 
     if (distance < 80) { // Rango de ataque melee
-      // Daño según el combo
-      const damage = comboCount;
-      for (let i = 0; i < damage; i++) {
-        if (this.iceBoss.active) this.iceBoss.takeDamage();
+      if (this.dragonSolEquipped) this.checkDragonHit();
+      if (this.dragonAuraActive) {
+        this.applyDragonAttack(this.iceBoss);
+      } else {
+        const damage = comboCount;
+        for (let i = 0; i < damage; i++) {
+          if (this.iceBoss.active) this.iceBoss.takeDamage();
+        }
       }
 
       // Efecto visual de golpe
-      const hitEffect = this.add.circle(this.iceBoss.x, this.iceBoss.y, 20, 0xFFFFFF, 0.8);
+      const hitColor = this.dragonAuraActive ? 0xFFD700 : 0xFFFFFF;
+      const hitEffect = this.add.circle(this.iceBoss.x, this.iceBoss.y, 20, hitColor, 0.8);
       this.tweens.add({
         targets: hitEffect,
-        scale: 2,
-        alpha: 0,
+        scale: 2, alpha: 0,
         duration: 150,
         onComplete: () => hitEffect.destroy()
       });
@@ -1217,6 +1249,37 @@ export default class IceBossScene extends Phaser.Scene {
         this.healthText.setText(`Ice Boss: ${this.iceBoss.health}`);
       }
     }
+  }
+
+  checkDragonHit() {
+    if (this.dragonAuraActive) return;
+    const now = this.time.now;
+    if (this.dragonWindowStart === 0) this.dragonWindowStart = now;
+    if (now - this.dragonWindowStart > 5 * 60 * 1000) {
+      this.dragonHits = 0;
+      this.dragonWindowStart = now;
+    }
+    this.dragonHits++;
+    if (this.dragonHits >= 10) this.activateDragonAura();
+  }
+
+  activateDragonAura() {
+    this.dragonAuraActive = true;
+    this.dragonAuraCircle = this.add.circle(this.dolphin.x, this.dolphin.y, 48, 0xFFD700, 0.3).setDepth(4);
+    this.tweens.add({ targets: this.dragonAuraCircle, scale: 1.3, alpha: 0.55, duration: 600, yoyo: true, repeat: -1 });
+    const txt = this.add.text(400, 265, 'AURA DEL DRAGON SOL', {
+      fontSize: '22px', fill: '#FFD700', fontFamily: 'Courier New', fontStyle: 'bold',
+      stroke: '#FF6600', strokeThickness: 4
+    }).setOrigin(0.5).setDepth(20);
+    this.tweens.add({ targets: txt, alpha: 0, y: 215, duration: 2500, onComplete: () => txt.destroy() });
+    this.soundGen.play('shootFire');
+  }
+
+  applyDragonAttack(boss) {
+    for (let i = 0; i < 5; i++) { if (boss.active) boss.takeDamage(); }
+    const pushDir = (this.dolphin.x < boss.x) ? 1 : -1;
+    boss.x += pushDir * 30;
+    boss.stunnedUntil = this.time.now + 500;
   }
 
   // Crear torbellino de Clon
@@ -1262,8 +1325,8 @@ export default class IceBossScene extends Phaser.Scene {
 
       if (this.iceBoss && this.iceBoss.active) {
         const dist = Phaser.Math.Distance.Between(magnet.x, magnet.y, this.iceBoss.x, this.iceBoss.y);
-        if (dist < 160) {
-          for (let i = 0; i < 12; i++) {
+        if (dist < 100) {
+          for (let i = 0; i < 5; i++) {
             if (this.iceBoss.active) this.iceBoss.takeDamage();
           }
           if (this.healthText && this.iceBoss.active) {
@@ -1311,8 +1374,8 @@ export default class IceBossScene extends Phaser.Scene {
       this.snowballs.getChildren().forEach(snowball => {
         if (!snowball.active) return;
         const dist = Phaser.Math.Distance.Between(snowball.x, snowball.y, m.sprite.x, m.sprite.y);
-        if (dist < 180) {
-          if (dist < 22) {
+        if (dist < 120) {
+          if (dist < 16) {
             snowball.setActive(false);
             snowball.setVisible(false);
             if (snowball.body) snowball.body.stop();
@@ -1323,6 +1386,23 @@ export default class IceBossScene extends Phaser.Scene {
         }
       });
     });
+  }
+
+  handlePerritoMelee(hitX, hitY, perrito) {
+    if (this.gameOver || this.gameWon) return;
+    this.soundGen.play('hit');
+
+    if (this.iceBoss && this.iceBoss.active) {
+      const dist = Phaser.Math.Distance.Between(hitX, hitY, this.iceBoss.x, this.iceBoss.y);
+      if (dist < 90) {
+        this.iceBoss.takeDamage();
+        if (this.healthText && this.iceBoss.active) {
+          this.healthText.setText(`Ice Boss: ${this.iceBoss.health}`);
+        }
+        const impact = this.add.circle(this.iceBoss.x, this.iceBoss.y, 25, perrito.magnetColor, 0.7);
+        this.tweens.add({ targets: impact, alpha: 0, scale: 2, duration: 300, onComplete: () => impact.destroy() });
+      }
+    }
   }
 
   createTorbellino(x, y, flipX) {
@@ -1497,11 +1577,15 @@ export default class IceBossScene extends Phaser.Scene {
 
       // No permitir movimiento si está congelado
       if (!this.dolphin.isFrozen) {
-        this.dolphin.update(cursors, wasd, spaceBar, xKey);
+        this.dolphin.update(cursors, wasd, spaceBar, xKey, this.qKey);
       }
 
       if (this.iceBoss && this.iceBoss.active) {
         this.iceBoss.update();
+      }
+
+      if (this.dragonAuraCircle && this.dragonAuraCircle.active && this.dolphin && this.dolphin.active) {
+        this.dragonAuraCircle.setPosition(this.dolphin.x, this.dolphin.y);
       }
 
       // Actualizar nieve

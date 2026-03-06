@@ -85,11 +85,12 @@ export default class MenuScene extends Phaser.Scene {
       ease: 'Sine.easeInOut'
     });
 
-    // Contador de placas (arriba derecha, al lado del título)
-    this.platesCounter = this.add.text(790, 15, `PLACAS: ${this.getPlates()}`, {
-      fontSize: '11px',
-      fill: '#C0C0C0',
-      fontFamily: 'Courier New'
+    // Contador de placas y pousos (arriba derecha)
+    this.platesCounter = this.add.text(790, 11, `PLACAS: ${this.getPlates()}`, {
+      fontSize: '11px', fill: '#C0C0C0', fontFamily: 'Courier New'
+    }).setOrigin(1, 0.5).setDepth(3);
+    this.pousosCounter = this.add.text(790, 24, `POUSOS: ${this.getPousos()}`, {
+      fontSize: '11px', fill: '#FFD700', fontFamily: 'Courier New'
     }).setOrigin(1, 0.5).setDepth(3);
 
     // === SELECTOR DE PERSONAJE (arriba, justo después del título) ===
@@ -168,7 +169,39 @@ export default class MenuScene extends Phaser.Scene {
     this.char5Btn.on('pointerover', () => { if (this.selectedCharacter !== 'perrito') this.char5Btn.setFillStyle(0x441144); });
     this.char5Btn.on('pointerout', () => { if (this.selectedCharacter !== 'perrito') this.char5Btn.setFillStyle(0x333355); });
 
-    // Boss fijo: Jefe de Hielo (Pulpo eliminado)
+    // === SELECTOR DE BOSS ===
+    const bossY = this.isMobileDevice ? 150 : 158;
+    this.add.text(400, bossY - 14, 'Elige el boss:', {
+      fontSize: this.isMobileDevice ? '11px' : '13px', fill: '#FF4444', fontFamily: 'Courier New'
+    }).setOrigin(0.5);
+
+    this.bossIceBtn = this.add.rectangle(205, bossY, 120, 26, 0x003355);
+    this.bossIceBtn.setStrokeStyle(2, 0x00BFFF).setInteractive({ useHandCursor: true });
+    this.add.text(205, bossY, '❄ Jefe Hielo', {
+      fontSize: '11px', fill: '#00BFFF', fontFamily: 'Courier New', fontStyle: 'bold'
+    }).setOrigin(0.5);
+
+    this.bossFinalBtn = this.add.rectangle(400, bossY, 120, 26, 0x330000);
+    this.bossFinalBtn.setStrokeStyle(2, 0x444444).setInteractive({ useHandCursor: true });
+    this.add.text(400, bossY, '💀 Hector', {
+      fontSize: '11px', fill: '#FF4444', fontFamily: 'Courier New', fontStyle: 'bold'
+    }).setOrigin(0.5);
+
+    this.bossBlibluBtn = this.add.rectangle(595, bossY, 120, 26, 0x3a2200);
+    this.bossBlibluBtn.setStrokeStyle(2, 0xFF8800).setInteractive({ useHandCursor: true });
+    this.add.text(595, bossY, '🟠 Bliblu', {
+      fontSize: '11px', fill: '#FF8800', fontFamily: 'Courier New', fontStyle: 'bold'
+    }).setOrigin(0.5);
+
+    this.bossIceBtn.on('pointerdown', () => this.selectBoss('iceBoss'));
+    this.bossFinalBtn.on('pointerdown', () => this.selectBoss('finalBoss'));
+    this.bossBlibluBtn.on('pointerdown', () => this.selectBoss('bliblu'));
+    this.bossIceBtn.on('pointerover', () => this.bossIceBtn.setFillStyle(0x005577));
+    this.bossIceBtn.on('pointerout', () => this.bossIceBtn.setFillStyle(this.selectedBoss === 'iceBoss' ? 0x004466 : 0x003355));
+    this.bossFinalBtn.on('pointerover', () => this.bossFinalBtn.setFillStyle(0x550000));
+    this.bossFinalBtn.on('pointerout', () => this.bossFinalBtn.setFillStyle(this.selectedBoss === 'finalBoss' ? 0x440000 : 0x330000));
+    this.bossBlibluBtn.on('pointerover', () => this.bossBlibluBtn.setFillStyle(0x664400));
+    this.bossBlibluBtn.on('pointerout', () => this.bossBlibluBtn.setFillStyle(this.selectedBoss === 'bliblu' ? 0x553300 : 0x3a2200));
 
     // === SELECCIÓN DE BALAS (solo visible para Mielito) ===
     this.bulletUIElements = [];
@@ -470,8 +503,24 @@ export default class MenuScene extends Phaser.Scene {
     this.updatePlayButton();
   }
 
+  selectBoss(bossType) {
+    this.selectedBoss = bossType;
+    this.bossIceBtn.setFillStyle(0x003355); this.bossIceBtn.setStrokeStyle(2, 0x444444);
+    this.bossFinalBtn.setFillStyle(0x330000); this.bossFinalBtn.setStrokeStyle(2, 0x444444);
+    this.bossBlibluBtn.setFillStyle(0x3a2200); this.bossBlibluBtn.setStrokeStyle(2, 0x444444);
+    if (bossType === 'iceBoss') {
+      this.bossIceBtn.setFillStyle(0x004466); this.bossIceBtn.setStrokeStyle(2, 0x00EEFF);
+    } else if (bossType === 'finalBoss') {
+      this.bossFinalBtn.setFillStyle(0x440000); this.bossFinalBtn.setStrokeStyle(2, 0xFF2200);
+    } else if (bossType === 'bliblu') {
+      this.bossBlibluBtn.setFillStyle(0x553300); this.bossBlibluBtn.setStrokeStyle(2, 0xFF8800);
+    }
+  }
+
   startGame() {
-    const sceneName = 'IceBossScene';
+    const sceneName = this.selectedBoss === 'finalBoss' ? 'FinalBossScene'
+      : this.selectedBoss === 'bliblu' ? 'BlibluBossScene'
+      : 'IceBossScene';
     this.scene.start(sceneName, {
       selectedBullets: this.selectedBullets,
       selectedCharacter: this.selectedCharacter
@@ -893,35 +942,43 @@ export default class MenuScene extends Phaser.Scene {
   drawWheelGraphics(g, radius) {
     const toRad = Phaser.Math.DegToRad;
 
-    // 100 placas — verde (50%): 0° a 180°
-    g.fillStyle(0x27ae60);
+    // 5 pousos — amarillo dorado (50%): 0° a 180°
+    g.fillStyle(0xFFD700);
     g.beginPath();
     g.moveTo(0, 0);
     g.arc(0, 0, radius, toRad(0), toRad(180), false);
     g.closePath();
     g.fillPath();
 
-    // 250 placas — azul (20%): 180° a 252°
+    // 100 placas — verde (25%): 180° a 270°
+    g.fillStyle(0x27ae60);
+    g.beginPath();
+    g.moveTo(0, 0);
+    g.arc(0, 0, radius, toRad(180), toRad(270), false);
+    g.closePath();
+    g.fillPath();
+
+    // 250 placas — azul (10%): 270° a 306°
     g.fillStyle(0x2980b9);
     g.beginPath();
     g.moveTo(0, 0);
-    g.arc(0, 0, radius, toRad(180), toRad(252), false);
+    g.arc(0, 0, radius, toRad(270), toRad(306), false);
     g.closePath();
     g.fillPath();
 
-    // 500 placas — dorado (10%): 252° a 288°
+    // 500 placas — naranja (5%): 306° a 324°
     g.fillStyle(0xe67e22);
     g.beginPath();
     g.moveTo(0, 0);
-    g.arc(0, 0, radius, toRad(252), toRad(288), false);
+    g.arc(0, 0, radius, toRad(306), toRad(324), false);
     g.closePath();
     g.fillPath();
 
-    // Skin Tierra Perrito — marrón (20%): 288° a 360°
+    // Skin Tierra — marrón (10%): 324° a 360°
     g.fillStyle(0x8B4513);
     g.beginPath();
     g.moveTo(0, 0);
-    g.arc(0, 0, radius, toRad(288), toRad(360), false);
+    g.arc(0, 0, radius, toRad(324), toRad(360), false);
     g.closePath();
     g.fillPath();
 
@@ -931,8 +988,9 @@ export default class MenuScene extends Phaser.Scene {
     g.lineStyle(2, 0xffffff, 1);
     g.lineBetween(0, 0, radius, 0);
     g.lineBetween(0, 0, radius * Math.cos(toRad(180)), radius * Math.sin(toRad(180)));
-    g.lineBetween(0, 0, radius * Math.cos(toRad(252)), radius * Math.sin(toRad(252)));
-    g.lineBetween(0, 0, radius * Math.cos(toRad(288)), radius * Math.sin(toRad(288)));
+    g.lineBetween(0, 0, radius * Math.cos(toRad(270)), radius * Math.sin(toRad(270)));
+    g.lineBetween(0, 0, radius * Math.cos(toRad(306)), radius * Math.sin(toRad(306)));
+    g.lineBetween(0, 0, radius * Math.cos(toRad(324)), radius * Math.sin(toRad(324)));
 
     // Punto central
     g.fillStyle(0xffffff);
@@ -952,8 +1010,8 @@ export default class MenuScene extends Phaser.Scene {
     }).setOrigin(0.5).setDepth(11);
     this.shopUIGroup.add(title);
 
-    this.shopPlatesText = this.add.text(400, 65, `Tienes: ${this.getPlates()} placas de metal`, {
-      fontSize: '14px', fill: '#C0C0C0', fontFamily: 'Courier New'
+    this.shopPlatesText = this.add.text(400, 65, `Placas: ${this.getPlates()}  |  Pousos: ${this.getPousos()}`, {
+      fontSize: '13px', fill: '#C0C0C0', fontFamily: 'Courier New'
     }).setOrigin(0.5).setDepth(11);
     this.shopUIGroup.add(this.shopPlatesText);
 
@@ -978,7 +1036,7 @@ export default class MenuScene extends Phaser.Scene {
 
     const toRad = Phaser.Math.DegToRad;
     const lr = radius * 0.62;
-    [{ text: '100', angle: 90 }, { text: '250', angle: 216 }, { text: '500', angle: 270 }, { text: 'Tierra', angle: 324 }].forEach(l => {
+    [{ text: '5P', angle: 90 }, { text: '100', angle: 225 }, { text: '250', angle: 288 }, { text: '500', angle: 315 }, { text: 'Tierra', angle: 342 }].forEach(l => {
       const rad = toRad(l.angle);
       const lt = this.add.text(lr * Math.cos(rad), lr * Math.sin(rad), l.text, {
         fontSize: '13px', fill: '#ffffff', fontFamily: 'Courier New', fontStyle: 'bold'
@@ -994,10 +1052,11 @@ export default class MenuScene extends Phaser.Scene {
 
     const legendY = wheelY + radius + 14;
     [
-      { color: '#2ecc71', text: '■ 100 PLACAS — 50%' },
-      { color: '#3498db', text: '■ 250 PLACAS — 20%' },
-      { color: '#e67e22', text: '■ 500 PLACAS — 10%' },
-      { color: '#cd7f32', text: '■ Skin Tierra — 20%' }
+      { color: '#FFD700', text: '■ 5 POUSOS — 50%' },
+      { color: '#2ecc71', text: '■ 100 PLACAS — 25%' },
+      { color: '#3498db', text: '■ 250 PLACAS — 10%' },
+      { color: '#e67e22', text: '■ 500 PLACAS — 5%' },
+      { color: '#cd7f32', text: '■ Skin Tierra — 10%' }
     ].forEach((l, i) => {
       const lt = this.add.text(200, legendY + i * 16, l.text, {
         fontSize: '12px', fill: l.color, fontFamily: 'Courier New'
@@ -1005,7 +1064,7 @@ export default class MenuScene extends Phaser.Scene {
       this.shopUIGroup.add(lt);
     });
 
-    const spinBtnY = legendY + 4 * 16 + 18;
+    const spinBtnY = legendY + 5 * 16 + 18;
     if (this.canSpinToday()) {
       const spinBtn = this.add.rectangle(200, spinBtnY, 190, 40, 0x7B3F00);
       spinBtn.setStrokeStyle(2, 0xFFD700);
@@ -1037,6 +1096,80 @@ export default class MenuScene extends Phaser.Scene {
       fontSize: '17px', fill: '#FFD700', fontFamily: 'Courier New', fontStyle: 'bold'
     }).setOrigin(0.5).setDepth(11);
     this.shopUIGroup.add(this.spinResultText);
+
+    // ═══════════ COFRE DIARIO ═══════════
+    const chestSectionY = spinBtnY + 90;
+    const chestTitle = this.add.text(200, chestSectionY, '— COFRE DIARIO —', {
+      fontSize: '13px', fill: '#FFD700', fontFamily: 'Courier New', fontStyle: 'bold'
+    }).setOrigin(0.5).setDepth(11);
+    this.shopUIGroup.add(chestTitle);
+
+    const chestResultText = this.add.text(200, chestSectionY + 68, '', {
+      fontSize: '13px', fill: '#FFD700', fontFamily: 'Courier New', fontStyle: 'bold', align: 'center'
+    }).setOrigin(0.5).setDepth(11);
+
+    if (this.canOpenChestToday()) {
+      const chestBox = this.add.rectangle(200, chestSectionY + 30, 170, 36, 0x4a2800);
+      chestBox.setStrokeStyle(2, 0xFFD700).setInteractive({ useHandCursor: true }).setDepth(11);
+      const chestTxt = this.add.text(200, chestSectionY + 30, '[ ABRIR COFRE ]', {
+        fontSize: '13px', fill: '#FFD700', fontFamily: 'Courier New', fontStyle: 'bold'
+      }).setOrigin(0.5).setDepth(12);
+      chestBox.on('pointerdown', () => {
+        if (!this.isOpeningChest) {
+          chestBox.removeInteractive();
+          chestBox.setFillStyle(0x333333);
+          chestTxt.setFill('#666666');
+          this.openChest(chestResultText);
+        }
+      });
+      chestBox.on('pointerover', () => chestBox.setFillStyle(0x774400));
+      chestBox.on('pointerout', () => chestBox.setFillStyle(0x4a2800));
+      this.shopUIGroup.add(chestBox);
+      this.shopUIGroup.add(chestTxt);
+    } else {
+      const chestWait = this.add.text(200, chestSectionY + 30, 'Vuelve mañana', {
+        fontSize: '12px', fill: '#888888', fontFamily: 'Courier New'
+      }).setOrigin(0.5).setDepth(11);
+      this.shopUIGroup.add(chestWait);
+    }
+    this.shopUIGroup.add(chestResultText);
+
+    // ── Intercambio 500 placas → 10 pousos ──
+    const exchY = chestSectionY + 95;
+    const exchTitle = this.add.text(200, exchY, 'INTERCAMBIO', {
+      fontSize: '14px', fill: '#FFD700', fontFamily: 'Courier New', fontStyle: 'bold'
+    }).setOrigin(0.5).setDepth(11);
+    this.shopUIGroup.add(exchTitle);
+
+    const exchBox = this.add.rectangle(200, exchY + 22, 170, 28, 0x1a3a1a);
+    exchBox.setStrokeStyle(2, 0x44bb44).setInteractive({ useHandCursor: true }).setDepth(11);
+    const exchTxt = this.add.text(200, exchY + 22, '500 PLACAS → 10 POUSOS', {
+      fontSize: '11px', fill: '#44FF44', fontFamily: 'Courier New', fontStyle: 'bold'
+    }).setOrigin(0.5).setDepth(12);
+    exchBox.on('pointerover', () => exchBox.setFillStyle(0x2a5a2a));
+    exchBox.on('pointerout', () => exchBox.setFillStyle(0x1a3a1a));
+    exchBox.on('pointerdown', () => {
+      if (this.getPlates() >= 500) {
+        this.savePlates(this.getPlates() - 500);
+        this.savePousos(this.getPousos() + 10);
+        if (this.shopPlatesText) this.shopPlatesText.setText(`Placas: ${this.getPlates()}  |  Pousos: ${this.getPousos()}`);
+        this.platesCounter.setText(`PLACAS: ${this.getPlates()}`);
+        this.pousosCounter.setText(`POUSOS: ${this.getPousos()}`);
+        exchTxt.setText('¡Canjeado!');
+        exchTxt.setFill('#FFD700');
+        this.time.delayedCall(1500, () => {
+          if (exchTxt.active) { exchTxt.setText('500 PLACAS → 10 POUSOS'); exchTxt.setFill('#44FF44'); }
+        });
+      } else {
+        exchTxt.setText('FALTAN PLACAS');
+        exchTxt.setFill('#ff4444');
+        this.time.delayedCall(1500, () => {
+          if (exchTxt.active) { exchTxt.setText('500 PLACAS → 10 POUSOS'); exchTxt.setFill('#44FF44'); }
+        });
+      }
+    });
+    this.shopUIGroup.add(exchBox);
+    this.shopUIGroup.add(exchTxt);
 
     // ═══════════ COLUMNA DERECHA: SKINS DE CLON ═══════════
     const skinX = 600;
@@ -1231,6 +1364,64 @@ export default class MenuScene extends Phaser.Scene {
       this.openShop();
     });
 
+    // ═══════════ DRAGON DEL SOL DE ORO ═══════════
+    const dragonY = pPreviewY + 110;
+    const dragonTitle = this.add.text(skinX, dragonY, 'DRAGON DEL SOL DE ORO', {
+      fontSize: '11px', fill: '#FFD700', fontFamily: 'Courier New', fontStyle: 'bold'
+    }).setOrigin(0.5).setDepth(11);
+    this.shopUIGroup.add(dragonTitle);
+
+    const dragonOwned = this.isDragonSolOwned();
+    const dragonEquipped = this.isDragonSolEquipped();
+
+    const dragonDesc = this.add.text(skinX, dragonY + 14,
+      'Para Colombia Ball: 10 golpes = Aura Solar', {
+        fontSize: '10px', fill: dragonOwned ? '#FFB300' : '#aaaaaa', fontFamily: 'Courier New', align: 'center'
+      }).setOrigin(0.5).setDepth(11);
+    this.shopUIGroup.add(dragonDesc);
+
+    if (dragonOwned) {
+      const dragonBtnColor = dragonEquipped ? 0x665500 : 0x333355;
+      const dragonBtnBorder = dragonEquipped ? 0xFFD700 : 0x555577;
+      const dragonBtn = this.add.rectangle(skinX, dragonY + 34, 170, 24, dragonBtnColor);
+      dragonBtn.setStrokeStyle(2, dragonBtnBorder).setDepth(11).setInteractive({ useHandCursor: true });
+      const dragonBtnTxt = this.add.text(skinX, dragonY + 34,
+        dragonEquipped ? 'EQUIPADO (Colombia)' : 'EQUIPAR para Colombia', {
+          fontSize: '10px', fill: '#ffffff', fontFamily: 'Courier New', fontStyle: 'bold'
+        }).setOrigin(0.5).setDepth(12);
+      dragonBtn.on('pointerdown', () => {
+        this.setDragonSolEquipped(!dragonEquipped);
+        this.closeShop();
+        this.openShop();
+      });
+      this.shopUIGroup.add(dragonBtn);
+      this.shopUIGroup.add(dragonBtnTxt);
+    } else {
+      const dragonBuyBtn = this.add.rectangle(skinX, dragonY + 34, 140, 24, 0x553300);
+      dragonBuyBtn.setStrokeStyle(2, 0xFFAA00).setDepth(11).setInteractive({ useHandCursor: true });
+      const dragonBuyTxt = this.add.text(skinX, dragonY + 34, '30 POUSOS', {
+        fontSize: '10px', fill: '#FFD700', fontFamily: 'Courier New', fontStyle: 'bold'
+      }).setOrigin(0.5).setDepth(12);
+      dragonBuyBtn.on('pointerdown', () => {
+        if (this.getPousos() >= 30) {
+          this.savePousos(this.getPousos() - 30);
+          this.setDragonSolOwned();
+          this.closeShop();
+          this.openShop();
+        } else {
+          dragonBuyTxt.setText('FALTAN POUSOS');
+          dragonBuyTxt.setFill('#ff4444');
+          this.time.delayedCall(1500, () => {
+            if (dragonBuyTxt.active) { dragonBuyTxt.setText('30 POUSOS'); dragonBuyTxt.setFill('#FFD700'); }
+          });
+        }
+      });
+      dragonBuyBtn.on('pointerover', () => dragonBuyBtn.setFillStyle(0x886600));
+      dragonBuyBtn.on('pointerout', () => dragonBuyBtn.setFillStyle(0x553300));
+      this.shopUIGroup.add(dragonBuyBtn);
+      this.shopUIGroup.add(dragonBuyTxt);
+    }
+
     // Botón cerrar
     const closeBtn = this.add.rectangle(400, 618, 160, 36, 0x553333);
     closeBtn.setStrokeStyle(2, 0x775555).setInteractive({ useHandCursor: true }).setDepth(11);
@@ -1249,14 +1440,16 @@ export default class MenuScene extends Phaser.Scene {
 
     const rand = Math.random();
     let prize, segStart, segEnd;
-    if (rand < 0.5) {
-      prize = 100; segStart = 0; segEnd = 180;
-    } else if (rand < 0.7) {
-      prize = 250; segStart = 180; segEnd = 252;
-    } else if (rand < 0.8) {
-      prize = 500; segStart = 252; segEnd = 288;
+    if (rand < 0.50) {
+      prize = 'pousos_5'; segStart = 0; segEnd = 180;
+    } else if (rand < 0.75) {
+      prize = 100; segStart = 180; segEnd = 270;
+    } else if (rand < 0.85) {
+      prize = 250; segStart = 270; segEnd = 306;
+    } else if (rand < 0.90) {
+      prize = 500; segStart = 306; segEnd = 324;
     } else {
-      prize = 'perrito_tierra'; segStart = 288; segEnd = 360;
+      prize = 'perrito_tierra'; segStart = 324; segEnd = 360;
     }
 
     // El puntero apunta al tope (-90° en coords locales de la ruleta).
@@ -1280,10 +1473,16 @@ export default class MenuScene extends Phaser.Scene {
           localStorage.setItem('mielito_perrito_tierra_owned', 'true');
           resultColor = '#cd7f32';
           resultMsg = '¡Skin Tierra desbloqueada!';
+        } else if (prize === 'pousos_5') {
+          const newPousos = this.getPousos() + 5;
+          this.savePousos(newPousos);
+          if (this.shopPlatesText) this.shopPlatesText.setText(`Placas: ${this.getPlates()}  |  Pousos: ${newPousos}`);
+          resultColor = '#FFD700';
+          resultMsg = '¡+5 Pousos!';
         } else {
           const newTotal = this.getPlates() + prize;
           this.savePlates(newTotal);
-          this.shopPlatesText.setText(`Tienes: ${newTotal} placas de metal`);
+          if (this.shopPlatesText) this.shopPlatesText.setText(`Placas: ${newTotal}  |  Pousos: ${this.getPousos()}`);
           this.platesCounter.setText(`PLACAS: ${newTotal}`);
           resultColor = prize === 500 ? '#e67e22' : prize === 250 ? '#3498db' : '#2ecc71';
           resultMsg = `¡Ganaste ${prize} placas!`;
@@ -1320,7 +1519,7 @@ export default class MenuScene extends Phaser.Scene {
 
   setClonSkin(skin) {
     localStorage.setItem('mielito_clon_skin', skin);
-    this.platesCounter.setText(`PLACAS: ${this.getPlates()}`);
+    if (this.platesCounter) this.platesCounter.setText(`PLACAS: ${this.getPlates()}`);
   }
 
   isPerritoTierraOwned() {
@@ -1334,5 +1533,99 @@ export default class MenuScene extends Phaser.Scene {
   setPerritoSkin(skin) {
     localStorage.setItem('mielito_perrito_skin', skin);
     this.platesCounter.setText(`PLACAS: ${this.getPlates()}`);
+  }
+
+  // ── Pousos ──
+  getPousos() {
+    return parseInt(localStorage.getItem('mielito_pousos') || '0', 10);
+  }
+
+  savePousos(n) {
+    localStorage.setItem('mielito_pousos', String(n));
+    if (this.pousosCounter) this.pousosCounter.setText(`POUSOS: ${n}`);
+  }
+
+  // ── Cofre diario ──
+  canOpenChestToday() {
+    return localStorage.getItem('mielito_last_chest_date') !== new Date().toDateString();
+  }
+
+  recordChestOpen() {
+    localStorage.setItem('mielito_last_chest_date', new Date().toDateString());
+  }
+
+  openChest(resultText) {
+    this.isOpeningChest = true;
+    this.recordChestOpen();
+
+    const rand = Math.random();
+    let prize;
+    if (rand < 0.41)      prize = { type: 'plates', amount: 100 };
+    else if (rand < 0.51) prize = { type: 'plates', amount: 250 };
+    else if (rand < 0.55) prize = { type: 'plates', amount: 500 };
+    else if (rand < 0.60) prize = { type: 'skin_tierra' };
+    else if (rand < 0.90) prize = { type: 'pousos', amount: 10 };
+    else if (rand < 0.99) prize = { type: 'pousos', amount: 50 };
+    else                  prize = { type: 'dragon_sol' };
+
+    // Destello de apertura
+    const flash = this.add.rectangle(200, 555, 160, 40, 0xFFD700, 0.9).setDepth(20);
+    this.shopUIGroup.add(flash);
+    this.tweens.add({
+      targets: flash,
+      alpha: 0, scaleX: 2.5, scaleY: 2.5,
+      duration: 700,
+      onComplete: () => {
+        if (flash.active) flash.destroy();
+        this.isOpeningChest = false;
+
+        let msg, color;
+        if (prize.type === 'plates') {
+          const newTotal = this.getPlates() + prize.amount;
+          this.savePlates(newTotal);
+          if (this.shopPlatesText) this.shopPlatesText.setText(`Placas: ${newTotal}  |  Pousos: ${this.getPousos()}`);
+          if (this.platesCounter) this.platesCounter.setText(`PLACAS: ${newTotal}`);
+          msg = `+${prize.amount} placas!`;
+          color = prize.amount === 500 ? '#e67e22' : prize.amount === 250 ? '#3498db' : '#2ecc71';
+        } else if (prize.type === 'pousos') {
+          const newP = this.getPousos() + prize.amount;
+          this.savePousos(newP);
+          if (this.shopPlatesText) this.shopPlatesText.setText(`Placas: ${this.getPlates()}  |  Pousos: ${newP}`);
+          msg = `+${prize.amount} pousos!`;
+          color = '#FFD700';
+        } else if (prize.type === 'skin_tierra') {
+          localStorage.setItem('mielito_perrito_tierra_owned', 'true');
+          msg = 'Skin Tierra!';
+          color = '#cd7f32';
+        } else {
+          this.setDragonSolOwned();
+          msg = 'Dragon del Sol de Oro!';
+          color = '#FFD700';
+        }
+
+        if (resultText && resultText.active) {
+          resultText.setText(msg);
+          resultText.setFill(color);
+          this.tweens.add({ targets: resultText, scaleX: 1.4, scaleY: 1.4, duration: 200, yoyo: true, repeat: 2 });
+        }
+      }
+    });
+  }
+
+  // ── Dragon del Sol de Oro ──
+  isDragonSolOwned() {
+    return localStorage.getItem('mielito_dragon_sol_owned') === 'true';
+  }
+
+  setDragonSolOwned() {
+    localStorage.setItem('mielito_dragon_sol_owned', 'true');
+  }
+
+  isDragonSolEquipped() {
+    return localStorage.getItem('mielito_dragon_sol_equipped') === 'true';
+  }
+
+  setDragonSolEquipped(val) {
+    localStorage.setItem('mielito_dragon_sol_equipped', val ? 'true' : 'false');
   }
 }
