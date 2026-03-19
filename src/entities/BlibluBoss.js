@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 
+// BRUTUS — Boss cuerpo a cuerpo imprevisible
 export default class BlibluBoss extends Phaser.Physics.Arcade.Sprite {
   constructor(scene, x, y) {
     super(scene, x, y, 'bliblu');
@@ -7,22 +8,30 @@ export default class BlibluBoss extends Phaser.Physics.Arcade.Sprite {
     scene.add.existing(this);
     scene.physics.add.existing(this);
 
-    this.setScale(0.75);
+    this.setScale(0.85);
     this.setCollideWorldBounds(true);
     this.body.allowGravity = false;
 
-    this.health = 120;
-    this.maxHealth = 120;
+    this.health = 300;
+    this.maxHealth = 300;
 
     this.target = null;
-    this.walkSpeed = 90;
+    this.walkSpeed = 150;
     this.baseY = y;
 
     // Dash rebotante
     this.isDashing = false;
-    this.dashSpeed = 650;
+    this.dashSpeed = 950;
+    this.dashVelX = 0;
     this.bounceCount = 0;
-    this.maxBounces = 3;
+    this.maxBounces = 5;
+    this.dashTimeout = null;
+
+    // Jump slam
+    this.isJumping = false;
+
+    // Rage mode (below 50% HP)
+    this.rageMode = false;
 
     this.stunnedUntil = 0;
 
@@ -34,12 +43,29 @@ export default class BlibluBoss extends Phaser.Physics.Arcade.Sprite {
   }
 
   startBehavior() {
-    // Dash cada 5 segundos
-    this.dashTimer = this.scene.time.addEvent({
-      delay: 5000,
-      callback: this.performDash,
-      callbackScope: this,
-      loop: true
+    this.scheduleNextAttack();
+  }
+
+  scheduleNextAttack() {
+    if (!this.active) return;
+    // Ataques aleatorios cada 3-7 segundos (2-4 en rage mode)
+    const minDelay = this.rageMode ? 2000 : 3000;
+    const maxDelay = this.rageMode ? 4000 : 7000;
+    const delay = Phaser.Math.Between(minDelay, maxDelay);
+
+    this.attackScheduler = this.scene.time.delayedCall(delay, () => {
+      if (!this.active || this.isDashing || this.isJumping) {
+        this.scheduleNextAttack();
+        return;
+      }
+      // Elegir ataque al azar: 60% dash, 40% jump slam
+      const roll = Math.random();
+      if (roll < 0.6) {
+        this.performDash();
+      } else {
+        this.performJumpSlam();
+      }
+      this.scheduleNextAttack();
     });
   }
 
@@ -47,19 +73,14 @@ export default class BlibluBoss extends Phaser.Physics.Arcade.Sprite {
     if (!this.active) return;
     if (this.scene.time.now < this.stunnedUntil) return;
 
-    // Mantener Y fijo en el suelo
-    this.y = this.baseY;
-    this.setVelocityY(0);
+    // Durante jump no lockear Y
+    if (!this.isJumping) {
+      this.y = this.baseY;
+      this.setVelocityY(0);
+    }
 
     if (this.isDashing) {
-      // Detectar rebote en los bordes del mundo (solo cuando realmente cambia de dirección)
-      if (this.body.blocked.left && this.dashDir > 0) {
-        this.dashDir = 1;
-        this.bounceCount++;
-      } else if (this.body.blocked.right && this.dashDir > 0) {
-        this.dashDir = -1;
-        this.bounceCount++;
-      } else if (this.x <= 40 && this.dashVelX < 0) {
+      if (this.x <= 40 && this.dashVelX < 0) {
         this.dashVelX = Math.abs(this.dashVelX);
         this.bounceCount++;
       } else if (this.x >= 760 && this.dashVelX > 0) {
@@ -76,38 +97,44 @@ export default class BlibluBoss extends Phaser.Physics.Arcade.Sprite {
       return;
     }
 
+    if (this.isJumping) return;
+
     // Caminar hacia el jugador
     if (this.target && this.target.active) {
       const dx = this.target.x - this.x;
+      const speed = this.rageMode ? this.walkSpeed * 1.8 : this.walkSpeed;
       if (Math.abs(dx) > 10) {
         const dir = Math.sign(dx);
-        this.x += dir * this.walkSpeed * (1 / 60);
+        this.x += dir * speed * (1 / 60);
         this.setFlipX(dir < 0);
       }
     }
   }
 
   performDash() {
-    if (!this.active || this.isDashing || !this.target || !this.target.active) return;
+    if (!this.active || this.isDashing || this.isJumping) return;
 
     this.isDashing = true;
     this.bounceCount = 0;
     this.dashVelX = 0;
     this.setTexture('blibluDash');
 
-    // Efecto visual de carga
-    this.setTint(0xFF4400);
-    this.scene.time.delayedCall(300, () => {
+    // Efecto de carga (rojo en normal, rojo pulsante en rage)
+    this.setTint(0xFF2200);
+    const chargeTime = this.rageMode ? 150 : 300;
+
+    this.scene.time.delayedCall(chargeTime, () => {
       if (!this.active) return;
       this.clearTint();
+      const speed = this.rageMode ? this.dashSpeed * 1.4 : this.dashSpeed;
       const dir = this.target && this.target.active ? (this.target.x > this.x ? 1 : -1) : 1;
-      this.dashVelX = this.dashSpeed * dir;
+      this.dashVelX = speed * dir;
       this.setVelocityX(this.dashVelX);
       this.setFlipX(dir < 0);
       this.createDashTrail();
 
-      // Limite de tiempo del dash: 3 segundos
-      this.dashTimeout = this.scene.time.delayedCall(3000, () => {
+      const maxTime = this.rageMode ? 2000 : 3000;
+      this.dashTimeout = this.scene.time.delayedCall(maxTime, () => {
         if (this.active && this.isDashing) this.stopDash();
       });
     });
@@ -115,27 +142,63 @@ export default class BlibluBoss extends Phaser.Physics.Arcade.Sprite {
     this.scene.events.emit('blibluDash');
   }
 
+  performJumpSlam() {
+    if (!this.active || this.isDashing || this.isJumping) return;
+    if (!this.target || !this.target.active) return;
+
+    this.isJumping = true;
+    const targetX = Phaser.Math.Clamp(this.target.x, 60, 740);
+
+    // Saltar hacia arriba
+    this.scene.tweens.add({
+      targets: this,
+      y: this.baseY - 220,
+      duration: 380,
+      ease: 'Power2.easeOut',
+      onComplete: () => {
+        if (!this.active) { this.isJumping = false; return; }
+        // Moverse al X del jugador en el aire
+        this.x = targetX;
+        // Caer rápido
+        this.scene.tweens.add({
+          targets: this,
+          y: this.baseY,
+          duration: 220,
+          ease: 'Power3.easeIn',
+          onComplete: () => {
+            if (!this.active) { this.isJumping = false; return; }
+            this.isJumping = false;
+            // Shockwave al aterrizar
+            this.scene.events.emit('blibluSlam', this.x, this.baseY);
+            // Sacudir pantalla
+            this.scene.cameras.main.shake(200, 0.012);
+          }
+        });
+      }
+    });
+  }
+
   stopDash() {
     this.isDashing = false;
     this.setVelocityX(0);
     this.setTexture('bliblu');
     this.clearTint();
-    if (this.dashTimeout) this.dashTimeout.remove();
+    if (this.dashTimeout) { this.dashTimeout.remove(); this.dashTimeout = null; }
   }
 
   createDashTrail() {
-    for (let i = 0; i < 4; i++) {
-      this.scene.time.delayedCall(i * 60, () => {
+    for (let i = 0; i < 5; i++) {
+      this.scene.time.delayedCall(i * 50, () => {
         if (!this.scene || !this.active) return;
         const ghost = this.scene.add.sprite(this.x, this.y, 'blibluDash');
         ghost.setScale(this.scaleX, this.scaleY);
         ghost.setFlipX(this.flipX);
-        ghost.setAlpha(0.5 - i * 0.1);
-        ghost.setTint(0xFF6600);
+        ghost.setAlpha(0.5 - i * 0.08);
+        ghost.setTint(this.rageMode ? 0xFF0000 : 0xFF6600);
         this.scene.tweens.add({
           targets: ghost,
           alpha: 0,
-          duration: 200,
+          duration: 180,
           onComplete: () => ghost.destroy()
         });
       });
@@ -151,6 +214,12 @@ export default class BlibluBoss extends Phaser.Physics.Arcade.Sprite {
       if (this.active) this.clearTint();
     });
 
+    // Activar rage mode al 50% HP
+    if (!this.rageMode && this.health <= 150) {
+      this.rageMode = true;
+      this.scene.events.emit('blibluRage');
+    }
+
     if (this.health <= 0) {
       this.die();
     }
@@ -159,14 +228,14 @@ export default class BlibluBoss extends Phaser.Physics.Arcade.Sprite {
   }
 
   die() {
-    if (this.dashTimer) this.dashTimer.remove();
     if (this.dashTimeout) this.dashTimeout.remove();
+    if (this.attackScheduler) this.attackScheduler.remove();
 
     this.scene.tweens.add({
       targets: this,
       scale: 0,
       alpha: 0,
-      duration: 500,
+      duration: 600,
       onComplete: () => {
         this.scene.events.emit('blibluDied');
         this.setActive(false);

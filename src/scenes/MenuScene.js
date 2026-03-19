@@ -189,7 +189,7 @@ export default class MenuScene extends Phaser.Scene {
 
     this.bossBlibluBtn = this.add.rectangle(595, bossY, 120, 26, 0x3a2200);
     this.bossBlibluBtn.setStrokeStyle(2, 0xFF8800).setInteractive({ useHandCursor: true });
-    this.add.text(595, bossY, '🟠 Bliblu', {
+    this.add.text(595, bossY, '🔴 Brutus', {
       fontSize: '11px', fill: '#FF8800', fontFamily: 'Courier New', fontStyle: 'bold'
     }).setOrigin(0.5);
 

@@ -94,7 +94,7 @@ export default class BlibluBossScene extends Phaser.Scene {
     this.qKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.Q);
 
     // Limpiar solo los eventos del juego para evitar acumulación al reiniciar
-    ['dolphinShoot','blibluDied','dolphinJump','dolphinDash',
+    ['dolphinShoot','blibluDied','blibluSlam','blibluRage','dolphinJump','dolphinDash',
      'colombiaJump','colombiaDash','colombiaPunch','colombiaSpecial','colombiaAttack','colombiaEnergyBall',
      'triangleJump','triangleDash','triangleShoot','triangleShield','triangleFireball',
      'clonJump','clonDash','clonShoot','clonMelee','clonModeChange',
@@ -118,11 +118,13 @@ export default class BlibluBossScene extends Phaser.Scene {
     this.events.on('triangleFireball', this.createBigFireball, this);
     this.events.on('clonJump', () => this.soundGen.play('jump'), this);
     this.events.on('clonDash', () => this.soundGen.play('dash'), this);
-    this.events.on('clonShoot', (x, y, flipX) => this.createTorbellino(x, y, flipX), this);
+    this.events.on('clonShoot', (x, y, flipX) => this.createClonPlasma(x, y, flipX), this);
     this.events.on('clonMelee', this.handleClonMelee, this);
     this.events.on('clonModeChange', (mode) => {
-      if (this.ammoText) this.ammoText.setText(mode === 'melee' ? 'ESPACIO: Golpe | Q: cambiar | X: Dash' : 'ESPACIO: Torbellino | Q: cambiar | X: Dash');
+      if (this.ammoText) this.ammoText.setText(mode === 'melee' ? 'ESPACIO: Golpe | Q: cambiar | X: Dash' : 'ESPACIO: Plasma Nova | Q: cambiar | X: Dash');
     }, this);
+    this.events.on('blibluSlam', this.handleBrutusSlam, this);
+    this.events.on('blibluRage', this.handleBrutusRage, this);
     this.events.on('perritoJump', () => this.soundGen.play('jump'), this);
     this.events.on('perritoDash', () => this.soundGen.play('dash'), this);
     this.events.on('perritoMagnet', this.createMagnetBall, this);
@@ -225,8 +227,8 @@ export default class BlibluBossScene extends Phaser.Scene {
         backgroundColor: '#000000aa', padding: { x: 5, y: 2 }
       });
     } else if (this.selectedCharacter === 'clon') {
-      this.ammoText = this.add.text(10, 35, 'Torbellino: ∞ | X: Dash', {
-        fontSize: '16px', fill: '#00FF00', fontFamily: 'Courier New',
+      this.ammoText = this.add.text(10, 35, 'ESPACIO: Plasma Nova | Q: cambiar | X: Dash', {
+        fontSize: '12px', fill: '#00AAFF', fontFamily: 'Courier New',
         backgroundColor: '#000000aa', padding: { x: 5, y: 2 }
       });
     } else if (this.selectedCharacter === 'perrito') {
@@ -241,18 +243,18 @@ export default class BlibluBossScene extends Phaser.Scene {
       });
     }
 
-    this.bossHealthText = this.add.text(580, 10, `Bliblu: ${this.boss.health}`, {
-      fontSize: '16px', fill: '#FF6600', fontFamily: 'Courier New',
+    this.bossHealthText = this.add.text(580, 10, `BRUTUS: ${this.boss.health}`, {
+      fontSize: '16px', fill: '#FF3300', fontFamily: 'Courier New',
       backgroundColor: '#ffffffaa', padding: { x: 5, y: 2 }
     });
 
     // Barra de vida del boss
     this.bossBarBg = this.add.rectangle(400, 26, 300, 12, 0x333333).setDepth(5);
-    this.bossBar = this.add.rectangle(400 - 150 + 1, 26, 298, 10, 0xFF6600).setDepth(6);
+    this.bossBar = this.add.rectangle(400 - 150 + 1, 26, 298, 10, 0xFF3300).setDepth(6);
     this.bossBar.setOrigin(0, 0.5);
 
-    this.add.text(400, 14, 'BLIBLU', {
-      fontSize: '13px', fill: '#FF8800', fontFamily: 'Courier New', fontStyle: 'bold',
+    this.bossNameLabel = this.add.text(400, 14, '⚠ BRUTUS ⚠', {
+      fontSize: '13px', fill: '#FF4400', fontFamily: 'Courier New', fontStyle: 'bold',
       stroke: '#000', strokeThickness: 3
     }).setOrigin(0.5).setDepth(7);
 
@@ -267,7 +269,7 @@ export default class BlibluBossScene extends Phaser.Scene {
 
   updateBossHealthUI() {
     if (!this.boss.active) return;
-    if (this.bossHealthText) this.bossHealthText.setText(`Bliblu: ${this.boss.health}`);
+    if (this.bossHealthText) this.bossHealthText.setText(`BRUTUS: ${this.boss.health}`);
     if (this.bossBar) {
       const ratio = Math.max(0, this.boss.health / this.boss.maxHealth);
       this.bossBar.setSize(Math.round(298 * ratio), 10);
@@ -563,6 +565,62 @@ export default class BlibluBossScene extends Phaser.Scene {
     powerup.destroy();
   }
 
+  createClonPlasma(x, y, flipX) {
+    if (this.gameOver || this.gameWon) return;
+    const dir = flipX ? -1 : 1;
+    const plasma = this.physics.add.image(x + dir * 30, y, 'clonPlasma');
+    plasma.setScale(1.8);
+    plasma.body.allowGravity = false;
+    plasma.setVelocityX(dir * 200);
+
+    // Pulso visual
+    this.tweens.add({ targets: plasma, scale: 2.2, duration: 300, yoyo: true, repeat: -1 });
+
+    this.physics.add.overlap(this.boss, plasma, () => {
+      if (!plasma.active || !this.boss.active) return;
+      this.tweens.killTweensOf(plasma);
+      plasma.destroy();
+      // Explosión AoE
+      const boom = this.add.circle(this.boss.x, this.boss.y, 60, 0x0088FF, 0.7);
+      this.tweens.add({ targets: boom, scale: 2.5, alpha: 0, duration: 500, onComplete: () => boom.destroy() });
+      for (let i = 0; i < 20; i++) this.boss.takeDamage();
+      this.updateBossHealthUI();
+      this.soundGen.play('explosion');
+    });
+
+    // Auto-destruir si sale de pantalla
+    this.time.delayedCall(4000, () => { if (plasma && plasma.active) plasma.destroy(); });
+    this.soundGen.play('shootFire');
+  }
+
+  handleBrutusSlam(bossX, bossY) {
+    if (this.gameOver || this.gameWon) return;
+    // Shockwave visual
+    const wave = this.add.circle(bossX, bossY, 20, 0xFF4400, 0.8);
+    this.tweens.add({ targets: wave, scaleX: 6, scaleY: 2, alpha: 0, duration: 400, onComplete: () => wave.destroy() });
+    this.soundGen.play('explosion');
+    // Daño al jugador si está cerca
+    if (this.player && this.player.active) {
+      const dist = Phaser.Math.Distance.Between(bossX, bossY, this.player.x, this.player.y);
+      if (dist < 120) this.damageDolphin(1);
+    }
+  }
+
+  handleBrutusRage() {
+    if (this.gameOver || this.gameWon) return;
+    // Cambiar color de barra y label a rojo intenso
+    if (this.bossBar) this.bossBar.setFillStyle(0xFF0000);
+    if (this.bossNameLabel) {
+      this.bossNameLabel.setText('⚠ BRUTUS — FURIA ⚠').setFill('#FF0000');
+    }
+    // Alerta de rage
+    const rageText = this.add.text(400, 280, '¡FURIA!', {
+      fontSize: '60px', fill: '#FF0000', stroke: '#000', strokeThickness: 6
+    }).setOrigin(0.5).setDepth(20);
+    this.tweens.add({ targets: rageText, alpha: 0, scale: 2.5, duration: 1200, onComplete: () => rageText.destroy() });
+    this.soundGen.play('explosion');
+  }
+
   // ── Victoria / Derrota ──
 
   handleVictory() {
@@ -572,7 +630,7 @@ export default class BlibluBossScene extends Phaser.Scene {
     const plates = parseInt(localStorage.getItem('mielito_plates') || '0', 10);
     localStorage.setItem('mielito_plates', String(plates + 150));
     if (this.touchControls) this.touchControls.destroy();
-    this.gameOverText.setText('¡BLIBLU DERROTADO!').setFill('#FFD700').setVisible(true);
+    this.gameOverText.setText('¡BRUTUS DERROTADO!').setFill('#FFD700').setVisible(true);
     const msg = this.isMobileDevice ? 'Toca aquí para jugar de nuevo' : 'R: Jugar de nuevo | M: Menú';
     this.restartText.setText(msg).setVisible(true);
     this.input.keyboard.once('keydown-R', () => this.scene.restart());

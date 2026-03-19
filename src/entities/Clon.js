@@ -2,8 +2,10 @@ import Phaser from 'phaser';
 
 export default class Clon extends Phaser.Physics.Arcade.Sprite {
   constructor(scene, x, y, isPvPMode = false) {
-    const skin = localStorage.getItem('mielito_clon_skin') === 'robot' ? 'clon_robot' : 'clon';
+    const isRobot = localStorage.getItem('mielito_clon_skin') === 'robot';
+    const skin = isRobot ? 'clon_robot' : 'clon';
     super(scene, x, y, skin);
+    this.isRobotSkin = isRobot;
 
     scene.add.existing(this);
     scene.physics.add.existing(this);
@@ -35,12 +37,12 @@ export default class Clon extends Phaser.Physics.Arcade.Sprite {
     this.invulnerable = false;
     this.invulnerabilityTime = 300;
 
-    // Modo de ataque: 'torbellino' o 'melee'
-    this.attackMode = 'torbellino';
+    // Modo de ataque: 'plasma' o 'melee'
+    this.attackMode = 'plasma';
 
-    // Ataque: lanza torbellinos gigantes
+    // Ataque: Plasma Nova
     this.canShoot = true;
-    this.shootCooldown = 10000;
+    this.shootCooldown = 5000;
 
     // Melee
     this.canMelee = true;
@@ -81,14 +83,14 @@ export default class Clon extends Phaser.Physics.Arcade.Sprite {
 
     // Q: alternar modo de ataque
     if (qKey && Phaser.Input.Keyboard.JustDown(qKey)) {
-      this.attackMode = this.attackMode === 'torbellino' ? 'melee' : 'torbellino';
+      this.attackMode = this.attackMode === 'plasma' ? 'melee' : 'plasma';
       this.scene.events.emit('clonModeChange', this.attackMode);
     }
 
     // ESPACIO: atacar según modo
     if (Phaser.Input.Keyboard.JustDown(spaceBar)) {
-      if (this.attackMode === 'torbellino' && this.canShoot) {
-        this.shootTorbellino();
+      if (this.attackMode === 'plasma' && this.canShoot) {
+        this.shootPlasma();
       } else if (this.attackMode === 'melee' && this.canMelee && !this.isMeleeActive) {
         this.meleeAttack();
       }
@@ -100,18 +102,19 @@ export default class Clon extends Phaser.Physics.Arcade.Sprite {
     }
   }
 
-  shootTorbellino() {
+  shootPlasma() {
     this.canShoot = false;
 
     this.scene.events.emit('clonShoot', this.x, this.y, this.flipX, this);
 
-    // Efecto visual de disparo
-    const flash = this.scene.add.circle(this.x, this.y, 8, 0x00FF00, 0.7);
+    // Efecto visual de disparo (azul para robot, verde para normal)
+    const color = this.isRobotSkin ? 0x00AAFF : 0x00FF00;
+    const flash = this.scene.add.circle(this.x, this.y, 16, color, 0.9);
     this.scene.tweens.add({
       targets: flash,
       alpha: 0,
-      scale: 2,
-      duration: 250,
+      scale: 3,
+      duration: 350,
       onComplete: () => flash.destroy()
     });
 
@@ -128,9 +131,10 @@ export default class Clon extends Phaser.Physics.Arcade.Sprite {
     const hitX = this.x + dir * 60;
     const hitY = this.y;
 
-    // Efecto visual: arco verde
+    // Efecto visual: arco (azul para robot, verde para normal)
+    const slashColor = this.isRobotSkin ? 0x00AAFF : 0x00FF00;
     const slash = this.scene.add.graphics();
-    slash.lineStyle(6, 0x00FF00, 1);
+    slash.lineStyle(6, slashColor, 1);
     slash.beginPath();
     slash.arc(this.x + dir * 20, this.y, 50, Phaser.Math.DegToRad(dir > 0 ? -70 : 110), Phaser.Math.DegToRad(dir > 0 ? 70 : 250), false);
     slash.strokePath();
@@ -154,12 +158,27 @@ export default class Clon extends Phaser.Physics.Arcade.Sprite {
     const dashDirection = this.flipX ? -1 : 1;
     this.setVelocityX(this.dashSpeed * dashDirection);
 
-    // Efecto visual de dash
-    const dashTrail = this.scene.add.sprite(this.x, this.y, 'clon');
+    // Efecto visual de dash (azul eléctrico para robot, verde para normal)
+    const dashTint = this.isRobotSkin ? 0x00CCFF : 0x00FF00;
+    const dashTrail = this.scene.add.sprite(this.x, this.y, this.isRobotSkin ? 'clon_robot' : 'clon');
     dashTrail.setScale(this.scaleX);
     dashTrail.setFlipX(this.flipX);
-    dashTrail.setAlpha(0.3);
-    dashTrail.setTint(0x00FF00);
+    dashTrail.setAlpha(0.5);
+    dashTrail.setTint(dashTint);
+
+    // Robot: energía azul adicional al hacer dash
+    if (this.isRobotSkin) {
+      for (let i = 0; i < 4; i++) {
+        this.scene.time.delayedCall(i * 30, () => {
+          const spark = this.scene.add.circle(
+            this.x + Phaser.Math.Between(-20, 20),
+            this.y + Phaser.Math.Between(-15, 15),
+            Phaser.Math.Between(4, 9), 0x00DDFF, 0.9
+          );
+          this.scene.tweens.add({ targets: spark, alpha: 0, scale: 0, duration: 200, onComplete: () => spark.destroy() });
+        });
+      }
+    }
 
     this.scene.tweens.add({
       targets: dashTrail,

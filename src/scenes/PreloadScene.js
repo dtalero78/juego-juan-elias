@@ -282,6 +282,17 @@ export default class PreloadScene extends Phaser.Scene {
     iceBossGraphics.generateTexture('iceBoss', 80, 70);
     iceBossGraphics.destroy();
 
+    // Clon - Plasma Nova projectile (blue glowing orb)
+    const plasmaG = this.add.graphics();
+    plasmaG.fillStyle(0x0088FF, 1);
+    plasmaG.fillCircle(20, 20, 18);
+    plasmaG.fillStyle(0x44AAFF, 1);
+    plasmaG.fillCircle(20, 20, 12);
+    plasmaG.fillStyle(0xCCEEFF, 1);
+    plasmaG.fillCircle(20, 20, 6);
+    plasmaG.generateTexture('clonPlasma', 40, 40);
+    plasmaG.destroy();
+
     // Ice Boss Fase 2 - derretido, cuarteado, aura azul brillante
     const iceBossP2Graphics = this.add.graphics();
     // Cuerpo principal más oscuro y derretido (asimétrico)

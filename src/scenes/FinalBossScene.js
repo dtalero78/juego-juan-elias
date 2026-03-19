@@ -122,10 +122,10 @@ export default class FinalBossScene extends Phaser.Scene {
     this.events.on('triangleFireball', this.createBigFireball, this);
     this.events.on('clonJump', () => this.soundGen.play('jump'), this);
     this.events.on('clonDash', () => this.soundGen.play('dash'), this);
-    this.events.on('clonShoot', (x, y, flipX) => this.createTorbellino(x, y, flipX), this);
+    this.events.on('clonShoot', (x, y, flipX) => this.createClonPlasma(x, y, flipX), this);
     this.events.on('clonMelee', this.handleClonMelee, this);
     this.events.on('clonModeChange', (mode) => {
-      if (this.ammoText) this.ammoText.setText(mode === 'melee' ? 'ESPACIO: Golpe | Q: cambiar | X: Dash' : 'ESPACIO: Torbellino | Q: cambiar | X: Dash');
+      if (this.ammoText) this.ammoText.setText(mode === 'melee' ? 'ESPACIO: Golpe | Q: cambiar | X: Dash' : 'ESPACIO: Plasma Nova | Q: cambiar | X: Dash');
     }, this);
     this.events.on('perritoJump', () => this.soundGen.play('jump'), this);
     this.events.on('perritoDash', () => this.soundGen.play('dash'), this);
@@ -445,6 +445,26 @@ export default class FinalBossScene extends Phaser.Scene {
       const impact = this.add.circle(this.boss.x, this.boss.y, 25, perrito.magnetColor, 0.7);
       this.tweens.add({ targets: impact, alpha: 0, scale: 2, duration: 300, onComplete: () => impact.destroy() });
     }
+  }
+
+  createClonPlasma(x, y, flipX) {
+    if (this.gameOver || this.gameWon || !this.boss.active) return;
+    const dir = flipX ? -1 : 1;
+    const plasma = this.physics.add.image(x + dir * 30, y, 'clonPlasma');
+    plasma.setScale(1.8); plasma.body.allowGravity = false;
+    plasma.setVelocityX(dir * 200);
+    this.tweens.add({ targets: plasma, scale: 2.2, duration: 300, yoyo: true, repeat: -1 });
+    this.physics.add.overlap(this.boss, plasma, () => {
+      if (!plasma.active || !this.boss.active) return;
+      this.tweens.killTweensOf(plasma); plasma.destroy();
+      const boom = this.add.circle(this.boss.x, this.boss.y, 60, 0x0088FF, 0.7);
+      this.tweens.add({ targets: boom, scale: 2.5, alpha: 0, duration: 500, onComplete: () => boom.destroy() });
+      for (let i = 0; i < 10; i++) { if (this.boss.active) this.boss.takeDamage(); }
+      this.updateBossHealthUI();
+      this.soundGen.play('explosion');
+    });
+    this.time.delayedCall(4000, () => { if (plasma && plasma.active) plasma.destroy(); });
+    this.soundGen.play('shootFire');
   }
 
   handleClonMelee(hitX, hitY) {
