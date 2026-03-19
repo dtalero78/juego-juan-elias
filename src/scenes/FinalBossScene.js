@@ -101,7 +101,7 @@ export default class FinalBossScene extends Phaser.Scene {
     ['dolphinShoot','finalBossSpread','finalBossRay','finalBossDied','finalBossPhase2',
      'dolphinJump','dolphinDash','colombiaJump','colombiaDash','colombiaPunch','colombiaSpecial',
      'colombiaAttack','colombiaEnergyBall','triangleJump','triangleDash','triangleShoot',
-     'triangleShield','triangleFireball','clonJump','clonDash','clonShoot',
+     'triangleShield','triangleFireball','clonJump','clonDash','clonShoot','clonMelee','clonModeChange',
      'perritoJump','perritoDash','perritoMagnet','perritoMelee','perritoModeChange'
     ].forEach(e => this.events.off(e));
 
@@ -123,6 +123,10 @@ export default class FinalBossScene extends Phaser.Scene {
     this.events.on('clonJump', () => this.soundGen.play('jump'), this);
     this.events.on('clonDash', () => this.soundGen.play('dash'), this);
     this.events.on('clonShoot', (x, y, flipX) => this.createTorbellino(x, y, flipX), this);
+    this.events.on('clonMelee', this.handleClonMelee, this);
+    this.events.on('clonModeChange', (mode) => {
+      if (this.ammoText) this.ammoText.setText(mode === 'melee' ? 'ESPACIO: Golpe | Q: cambiar | X: Dash' : 'ESPACIO: Torbellino | Q: cambiar | X: Dash');
+    }, this);
     this.events.on('perritoJump', () => this.soundGen.play('jump'), this);
     this.events.on('perritoDash', () => this.soundGen.play('dash'), this);
     this.events.on('perritoMagnet', this.createMagnetBall, this);
@@ -304,6 +308,8 @@ export default class FinalBossScene extends Phaser.Scene {
     const torb = this.torbellinos.get(x, y);
     if (torb) {
       torb.fire(x, y, flipX ? -1 : 1);
+      torb.setScale(3.5);
+      torb.body.setSize(torb.width * 0.8, torb.height * 0.8);
       this.soundGen.play('shoot');
     }
   }
@@ -362,7 +368,7 @@ export default class FinalBossScene extends Phaser.Scene {
     this.tweens.killTweensOf(torb);
     torb.setActive(false);
     torb.setVisible(false);
-    boss.takeDamage();
+    for (let i = 0; i < 5; i++) { if (boss.active) boss.takeDamage(); }
     this.updateBossHealthUI();
     this.soundGen.play('hit');
   }
@@ -437,6 +443,18 @@ export default class FinalBossScene extends Phaser.Scene {
       this.boss.takeDamage();
       this.updateBossHealthUI();
       const impact = this.add.circle(this.boss.x, this.boss.y, 25, perrito.magnetColor, 0.7);
+      this.tweens.add({ targets: impact, alpha: 0, scale: 2, duration: 300, onComplete: () => impact.destroy() });
+    }
+  }
+
+  handleClonMelee(hitX, hitY) {
+    if (this.gameOver || this.gameWon || !this.boss.active) return;
+    this.soundGen.play('hit');
+    const dist = Phaser.Math.Distance.Between(hitX, hitY, this.boss.x, this.boss.y);
+    if (dist < 90) {
+      this.boss.takeDamage();
+      this.updateBossHealthUI();
+      const impact = this.add.circle(this.boss.x, this.boss.y, 30, 0x00FF00, 0.7);
       this.tweens.add({ targets: impact, alpha: 0, scale: 2, duration: 300, onComplete: () => impact.destroy() });
     }
   }
@@ -711,7 +729,6 @@ export default class FinalBossScene extends Phaser.Scene {
   // ─────────────────────────────────────────────
   hitPlayerWithBoss(player, boss) {
     if (!boss.active || player.invulnerable) return;
-    if (boss.phase === 2) return; // En fase 2 solo los rayos hacen daño
     this.damageDolphin(1);
   }
 

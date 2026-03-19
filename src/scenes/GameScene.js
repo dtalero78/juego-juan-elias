@@ -113,7 +113,7 @@ export default class GameScene extends Phaser.Scene {
     ['dolphinShoot','octopusShoot','octopusDied','dolphinJump','dolphinDash',
      'colombiaJump','colombiaDash','colombiaPunch','colombiaSpecial','colombiaAttack','colombiaEnergyBall',
      'triangleJump','triangleDash','triangleShoot','triangleShield','triangleFireball',
-     'clonJump','clonDash','clonShoot',
+     'clonJump','clonDash','clonShoot','clonMelee','clonModeChange',
      'perritoJump','perritoDash','perritoMagnet','perritoMelee','perritoModeChange'
     ].forEach(e => this.events.off(e));
 
@@ -144,6 +144,10 @@ export default class GameScene extends Phaser.Scene {
     this.events.on('clonDash', () => this.soundGen.play('dash'), this);
     this.events.on('clonShoot', (x, y, flipX) => {
       this.createTorbellino(x, y, flipX);
+    }, this);
+    this.events.on('clonMelee', this.handleClonMelee, this);
+    this.events.on('clonModeChange', (mode) => {
+      if (this.ammoText) this.ammoText.setText(mode === 'melee' ? 'ESPACIO: Golpe | Q: cambiar | X: Dash' : 'ESPACIO: Torbellino | Q: cambiar | X: Dash');
     }, this);
 
     // Eventos para Perrito
@@ -1407,11 +1411,27 @@ export default class GameScene extends Phaser.Scene {
     }
   }
 
+  handleClonMelee(hitX, hitY) {
+    if (this.gameOver || this.gameWon) return;
+    this.soundGen.play('hit');
+    if (this.octopus && this.octopus.active) {
+      const dist = Phaser.Math.Distance.Between(hitX, hitY, this.octopus.x, this.octopus.y);
+      if (dist < 90) {
+        this.octopus.takeDamage();
+        if (this.healthText) this.healthText.setText(`Villano: ${this.octopus.health}`);
+        const impact = this.add.circle(this.octopus.x, this.octopus.y, 30, 0x00FF00, 0.7);
+        this.tweens.add({ targets: impact, alpha: 0, scale: 2, duration: 300, onComplete: () => impact.destroy() });
+      }
+    }
+  }
+
   createTorbellino(x, y, flipX) {
     if (!this.gameOver && !this.gameWon) {
       const torb = this.torbellinos.get(x, y);
       if (torb) {
         torb.fire(x, y, flipX ? -1 : 1);
+        torb.setScale(3.5);
+        torb.body.setSize(torb.width * 0.8, torb.height * 0.8);
       }
       this.soundGen.play('shoot');
     }
@@ -1428,8 +1448,8 @@ export default class GameScene extends Phaser.Scene {
 
     this.soundGen.play('hit');
 
-    // El torbellino hace 3 de daño
-    for (let i = 0; i < 3; i++) {
+    // El torbellino hace 10 de daño
+    for (let i = 0; i < 10; i++) {
       if (octopus.active) octopus.takeDamage();
     }
 

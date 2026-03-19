@@ -97,7 +97,7 @@ export default class BlibluBossScene extends Phaser.Scene {
     ['dolphinShoot','blibluDied','dolphinJump','dolphinDash',
      'colombiaJump','colombiaDash','colombiaPunch','colombiaSpecial','colombiaAttack','colombiaEnergyBall',
      'triangleJump','triangleDash','triangleShoot','triangleShield','triangleFireball',
-     'clonJump','clonDash','clonShoot',
+     'clonJump','clonDash','clonShoot','clonMelee','clonModeChange',
      'perritoJump','perritoDash','perritoMagnet','perritoMelee','perritoModeChange'
     ].forEach(e => this.events.off(e));
 
@@ -119,6 +119,10 @@ export default class BlibluBossScene extends Phaser.Scene {
     this.events.on('clonJump', () => this.soundGen.play('jump'), this);
     this.events.on('clonDash', () => this.soundGen.play('dash'), this);
     this.events.on('clonShoot', (x, y, flipX) => this.createTorbellino(x, y, flipX), this);
+    this.events.on('clonMelee', this.handleClonMelee, this);
+    this.events.on('clonModeChange', (mode) => {
+      if (this.ammoText) this.ammoText.setText(mode === 'melee' ? 'ESPACIO: Golpe | Q: cambiar | X: Dash' : 'ESPACIO: Torbellino | Q: cambiar | X: Dash');
+    }, this);
     this.events.on('perritoJump', () => this.soundGen.play('jump'), this);
     this.events.on('perritoDash', () => this.soundGen.play('dash'), this);
     this.events.on('perritoMagnet', this.createMagnetBall, this);
@@ -320,7 +324,11 @@ export default class BlibluBossScene extends Phaser.Scene {
   createTorbellino(x, y, flipX) {
     if (this.gameOver || this.gameWon) return;
     const torb = this.torbellinos.get(x, y);
-    if (torb) torb.fire(x, y, flipX ? -1 : 1);
+    if (torb) {
+      torb.fire(x, y, flipX ? -1 : 1);
+      torb.setScale(3.5);
+      torb.body.setSize(torb.width * 0.8, torb.height * 0.8);
+    }
     this.soundGen.play('shoot');
   }
 
@@ -382,7 +390,7 @@ export default class BlibluBossScene extends Phaser.Scene {
     torb.setActive(false); torb.setVisible(false);
     torb.body.stop();
     this.tweens.killTweensOf(torb);
-    for (let i = 0; i < 3; i++) boss.takeDamage();
+    for (let i = 0; i < 10; i++) boss.takeDamage();
     this.updateBossHealthUI();
     this.soundGen.play('hit');
   }
@@ -432,6 +440,18 @@ export default class BlibluBossScene extends Phaser.Scene {
       this.updateBossHealthUI();
       const fx = this.add.circle(this.boss.x, this.boss.y, 25, perrito.magnetColor, 0.7);
       this.tweens.add({ targets: fx, alpha: 0, scale: 2, duration: 300, onComplete: () => fx.destroy() });
+    }
+  }
+
+  handleClonMelee(hitX, hitY) {
+    if (this.gameOver || this.gameWon || !this.boss || !this.boss.active) return;
+    this.soundGen.play('hit');
+    const dist = Phaser.Math.Distance.Between(hitX, hitY, this.boss.x, this.boss.y);
+    if (dist < 90) {
+      this.boss.takeDamage();
+      this.updateBossHealthUI();
+      const impact = this.add.circle(this.boss.x, this.boss.y, 30, 0x00FF00, 0.7);
+      this.tweens.add({ targets: impact, alpha: 0, scale: 2, duration: 300, onComplete: () => impact.destroy() });
     }
   }
 

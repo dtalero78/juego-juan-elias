@@ -104,17 +104,20 @@ export default class FinalBoss extends Phaser.Physics.Arcade.Sprite {
       }
       this.y = Phaser.Math.Clamp(this.y, 80, 490);
     } else {
-      this.x += this.phase1MoveSpeed * this.moveDir * (1 / 60);
-      if (this.x > 680) this.moveDir = -1;
-      if (this.x < 120) this.moveDir = 1;
-      this.y = this.baseY + Math.sin(this.floatTime) * 15;
+      if (this.target && this.target.active) {
+        const dx = this.target.x - this.x;
+        const dy = this.target.y - this.y;
+        this.x += Math.sign(dx) * this.phase1MoveSpeed * (1 / 60);
+        this.y += Math.sign(dy) * this.phase1MoveSpeed * (1 / 60);
+      }
+      this.y = Phaser.Math.Clamp(this.y, 80, 490);
     }
   }
 
   takeDamage() {
     if (!this.active) return this.health;
 
-    this.health -= 10;
+    this.health -= 2;
 
     if (this.health <= 0) {
       if (this.phase === 1) {

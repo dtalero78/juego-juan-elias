@@ -282,6 +282,61 @@ export default class PreloadScene extends Phaser.Scene {
     iceBossGraphics.generateTexture('iceBoss', 80, 70);
     iceBossGraphics.destroy();
 
+    // Ice Boss Fase 2 - derretido, cuarteado, aura azul brillante
+    const iceBossP2Graphics = this.add.graphics();
+    // Cuerpo principal más oscuro y derretido (asimétrico)
+    iceBossP2Graphics.fillStyle(0x1A6B8A, 1);
+    iceBossP2Graphics.fillEllipse(40, 38, 62, 55);
+    iceBossP2Graphics.fillStyle(0x0D4F6E, 1);
+    iceBossP2Graphics.fillEllipse(40, 38, 48, 42);
+    // Grietas
+    iceBossP2Graphics.lineStyle(2, 0x000033, 1);
+    iceBossP2Graphics.beginPath();
+    iceBossP2Graphics.moveTo(30, 20); iceBossP2Graphics.lineTo(22, 40);
+    iceBossP2Graphics.moveTo(50, 18); iceBossP2Graphics.lineTo(58, 38);
+    iceBossP2Graphics.moveTo(25, 45); iceBossP2Graphics.lineTo(38, 55);
+    iceBossP2Graphics.strokePath();
+    // Cuernos rotos
+    iceBossP2Graphics.fillStyle(0x0D4F6E, 1);
+    iceBossP2Graphics.beginPath();
+    iceBossP2Graphics.moveTo(20, 18); iceBossP2Graphics.lineTo(14, 2); iceBossP2Graphics.lineTo(26, 14);
+    iceBossP2Graphics.closePath(); iceBossP2Graphics.fillPath();
+    iceBossP2Graphics.beginPath();
+    iceBossP2Graphics.moveTo(60, 18); iceBossP2Graphics.lineTo(66, 2); iceBossP2Graphics.lineTo(54, 14);
+    iceBossP2Graphics.closePath(); iceBossP2Graphics.fillPath();
+    // Ojos brillantes rojos de rabia
+    iceBossP2Graphics.fillStyle(0xFF3300, 1);
+    iceBossP2Graphics.fillCircle(29, 32, 7);
+    iceBossP2Graphics.fillCircle(51, 32, 7);
+    iceBossP2Graphics.fillStyle(0xFF8800, 1);
+    iceBossP2Graphics.fillCircle(29, 32, 3);
+    iceBossP2Graphics.fillCircle(51, 32, 3);
+    // Boca más agresiva
+    iceBossP2Graphics.fillStyle(0x001133, 1);
+    iceBossP2Graphics.fillRect(28, 48, 24, 6);
+    // Gotas de agua (derritiéndose)
+    iceBossP2Graphics.fillStyle(0x55AADD, 0.8);
+    iceBossP2Graphics.fillCircle(18, 52, 4);
+    iceBossP2Graphics.fillCircle(62, 50, 3);
+    iceBossP2Graphics.fillCircle(40, 60, 4);
+    iceBossP2Graphics.generateTexture('iceBossP2', 80, 70);
+    iceBossP2Graphics.destroy();
+
+    // Mini-enemigo de hielo (fase 2 del Ice Boss)
+    const miniIceGraphics = this.add.graphics();
+    miniIceGraphics.fillStyle(0xAADDFF, 1);
+    miniIceGraphics.fillCircle(12, 12, 10);
+    miniIceGraphics.fillStyle(0x0088CC, 1);
+    miniIceGraphics.fillCircle(12, 12, 6);
+    miniIceGraphics.fillStyle(0xFFFFFF, 1);
+    miniIceGraphics.fillCircle(9, 10, 3);
+    miniIceGraphics.fillCircle(15, 10, 3);
+    miniIceGraphics.fillStyle(0x000055, 1);
+    miniIceGraphics.fillCircle(9, 10, 1);
+    miniIceGraphics.fillCircle(15, 10, 1);
+    miniIceGraphics.generateTexture('miniIceEnemy', 24, 24);
+    miniIceGraphics.destroy();
+
     // Bola de nieve
     const snowballGraphics = this.add.graphics();
     snowballGraphics.fillStyle(0xFFFFFF, 1);

@@ -14,6 +14,7 @@ export default class IceBoss extends Phaser.Physics.Arcade.Sprite {
     this.body.allowGravity = false;
     this.health = 80;
     this.maxHealth = 80;
+    this.phase = 1;
 
     // Dash del boss
     this.canDash = true;
@@ -29,6 +30,8 @@ export default class IceBoss extends Phaser.Physics.Arcade.Sprite {
     // Movimiento flotante
     this.floatTime = 0;
     this.baseY = y;
+
+    this.stunnedUntil = 0;
 
     // Referencia al delfín para perseguirlo
     this.target = null;
@@ -61,6 +64,7 @@ export default class IceBoss extends Phaser.Physics.Arcade.Sprite {
 
   update() {
     if (!this.active) return;
+    if (this.scene.time.now < this.stunnedUntil) return;
 
     // Movimiento flotante suave
     this.floatTime += 0.02;
@@ -79,6 +83,11 @@ export default class IceBoss extends Phaser.Physics.Arcade.Sprite {
     // Limitar posición
     this.x = Phaser.Math.Clamp(this.x, 400, 750);
     this.y = Phaser.Math.Clamp(this.y, 80, 550);
+
+    // Aura sigue al boss en fase 2
+    if (this.auraCircle) {
+      this.auraCircle.setPosition(this.x, this.y);
+    }
   }
 
   // Disparar bola de nieve hacia el jugador
@@ -86,19 +95,55 @@ export default class IceBoss extends Phaser.Physics.Arcade.Sprite {
     if (!this.active || !this.target || !this.target.active) return;
     if (this.isDashing) return;
 
-    // Calcular dirección hacia el jugador
-    const angle = Phaser.Math.Angle.Between(
-      this.x, this.y,
-      this.target.x, this.target.y
-    );
+    const angle = Phaser.Math.Angle.Between(this.x, this.y, this.target.x, this.target.y);
 
     this.scene.events.emit('iceBossShoot', this.x - 30, this.y, angle);
+
+    // Fase 2: dispara una segunda bola con ángulo ligeramente diferente
+    if (this.phase === 2) {
+      this.scene.events.emit('iceBossShoot', this.x - 30, this.y, angle + 0.25);
+      this.scene.events.emit('iceBossShoot', this.x - 30, this.y, angle - 0.25);
+    }
 
     // Efecto visual de disparo
     this.setTint(0x00BFFF);
     this.scene.time.delayedCall(100, () => {
       if (this.active) this.clearTint();
     });
+  }
+
+  transitionToPhase2() {
+    this.phase = 2;
+
+    // Flash de transición
+    let flashes = 0;
+    const flashTimer = this.scene.time.addEvent({
+      delay: 100,
+      callback: () => {
+        this.setVisible(!this.visible);
+        flashes++;
+        if (flashes >= 10) {
+          flashTimer.remove();
+          this.setVisible(true);
+          this.setTexture('iceBossP2');
+        }
+      },
+      loop: true
+    });
+
+    // Aura azul brillante pulsante
+    this.auraCircle = this.scene.add.circle(this.x, this.y, 55, 0x00FFFF, 0.0);
+    this.auraCircle.setDepth(this.depth - 1);
+    this.scene.tweens.add({
+      targets: this.auraCircle,
+      alpha: 0.45,
+      duration: 500,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut'
+    });
+
+    this.scene.events.emit('iceBossPhase2');
   }
 
   // Dash hacia el jugador
@@ -179,6 +224,11 @@ export default class IceBoss extends Phaser.Physics.Arcade.Sprite {
       if (this.active) this.clearTint();
     });
 
+    // Transición a fase 2 al llegar a la mitad de vida
+    if (this.phase === 1 && this.health <= 40) {
+      this.transitionToPhase2();
+    }
+
     if (this.health <= 0) {
       this.die();
     }
@@ -189,6 +239,7 @@ export default class IceBoss extends Phaser.Physics.Arcade.Sprite {
   die() {
     if (this.shootTimer) this.shootTimer.remove();
     if (this.dashTimer) this.dashTimer.remove();
+    if (this.auraCircle) { this.auraCircle.destroy(); this.auraCircle = null; }
 
     // Efecto de muerte congelada
     this.scene.tweens.add({

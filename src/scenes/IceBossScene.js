@@ -115,17 +115,22 @@ export default class IceBossScene extends Phaser.Scene {
     this.qKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.Q);
 
     // Limpiar solo los eventos del juego para evitar acumulación al reiniciar
-    ['dolphinShoot','iceBossShoot','iceBossDied','dolphinJump','dolphinDash',
+    ['dolphinShoot','iceBossShoot','iceBossDied','iceBossPhase2','dolphinJump','dolphinDash',
      'colombiaJump','colombiaDash','colombiaPunch','colombiaSpecial','colombiaAttack','colombiaEnergyBall',
      'triangleJump','triangleDash','triangleShoot','triangleShield','triangleFireball',
-     'clonJump','clonDash','clonShoot',
+     'clonJump','clonDash','clonShoot','clonMelee','clonModeChange',
      'perritoJump','perritoDash','perritoMagnet','perritoMelee','perritoModeChange'
     ].forEach(e => this.events.off(e));
+
+    // Mini-enemigos
+    this.miniEnemies = [];
+    this.minionTimer = null;
 
     // Eventos
     this.events.on('dolphinShoot', this.createBullet, this);
     this.events.on('iceBossShoot', this.createSnowball, this);
     this.events.on('iceBossDied', this.handleVictory, this);
+    this.events.on('iceBossPhase2', this.startPhase2, this);
     this.events.on('dolphinJump', () => this.soundGen.play('jump'), this);
     this.events.on('dolphinDash', () => this.soundGen.play('dash'), this);
 
@@ -149,6 +154,10 @@ export default class IceBossScene extends Phaser.Scene {
     this.events.on('clonDash', () => this.soundGen.play('dash'), this);
     this.events.on('clonShoot', (x, y, flipX) => {
       this.createTorbellino(x, y, flipX);
+    }, this);
+    this.events.on('clonMelee', this.handleClonMelee, this);
+    this.events.on('clonModeChange', (mode) => {
+      if (this.ammoText) this.ammoText.setText(mode === 'melee' ? 'ESPACIO: Golpe | Q: cambiar | X: Dash' : 'ESPACIO: Torbellino | Q: cambiar | X: Dash');
     }, this);
 
     // Eventos para Perrito
@@ -1056,8 +1065,78 @@ export default class IceBossScene extends Phaser.Scene {
     }
   }
 
+  startPhase2() {
+    // Texto de alerta
+    const alertText = this.add.text(400, 300, '¡FASE 2!', {
+      fontSize: '52px', fill: '#00FFFF', stroke: '#003366', strokeThickness: 6
+    }).setOrigin(0.5).setDepth(20);
+    this.tweens.add({
+      targets: alertText, alpha: 0, scale: 2, duration: 1500,
+      onComplete: () => alertText.destroy()
+    });
+
+    if (this.healthText) this.healthText.setFill('#00FFFF');
+
+    // Spawn de mini-enemigos cada 30 segundos
+    this.minionTimer = this.time.addEvent({
+      delay: 30000,
+      callback: this.spawnMiniEnemies,
+      callbackScope: this,
+      loop: true
+    });
+    // Primera oleada inmediata tras 2s
+    this.time.delayedCall(2000, () => this.spawnMiniEnemies());
+  }
+
+  spawnMiniEnemies() {
+    if (this.gameOver || this.gameWon) return;
+
+    for (let i = 0; i < 5; i++) {
+      const side = Math.random() < 0.5 ? 0 : 800;
+      const y = Phaser.Math.Between(100, 550);
+      const enemy = this.physics.add.sprite(side, y, 'miniIceEnemy');
+      enemy.setScale(1.2);
+      enemy.body.allowGravity = false;
+      enemy.health = 1;
+
+      this.miniEnemies.push(enemy);
+
+      // Overlap con balas del jugador
+      this.physics.add.overlap(enemy, this.bullets, (e, b) => {
+        if (!e.active || !b.active) return;
+        b.setActive(false); b.setVisible(false);
+        this.tweens.killTweensOf(b);
+        const fx = this.add.circle(e.x, e.y, 18, 0x00FFFF, 0.8);
+        this.tweens.add({ targets: fx, alpha: 0, scale: 2.5, duration: 250, onComplete: () => fx.destroy() });
+        e.setActive(false); e.setVisible(false);
+        const idx = this.miniEnemies.indexOf(e); if (idx !== -1) this.miniEnemies.splice(idx, 1);
+      });
+
+      // Overlap con torbellinos del Clon
+      this.physics.add.overlap(enemy, this.torbellinos, (e, t) => {
+        if (!e.active || !t.active) return;
+        t.setActive(false); t.setVisible(false); t.body.stop(); this.tweens.killTweensOf(t);
+        const fx = this.add.circle(e.x, e.y, 18, 0x00FF00, 0.8);
+        this.tweens.add({ targets: fx, alpha: 0, scale: 2.5, duration: 250, onComplete: () => fx.destroy() });
+        e.setActive(false); e.setVisible(false);
+        const idx = this.miniEnemies.indexOf(e); if (idx !== -1) this.miniEnemies.splice(idx, 1);
+      });
+
+      // Overlap con el jugador
+      this.physics.add.overlap(this.dolphin, enemy, (player, e) => {
+        if (!e.active || player.invulnerable) return;
+        e.setActive(false); e.setVisible(false);
+        const idx = this.miniEnemies.indexOf(e); if (idx !== -1) this.miniEnemies.splice(idx, 1);
+        this.damageDolphin(1);
+      });
+    }
+  }
+
   handleVictory() {
     this.gameWon = true;
+    if (this.minionTimer) { this.minionTimer.remove(); this.minionTimer = null; }
+    this.miniEnemies.forEach(e => { if (e.active) { e.setActive(false); e.setVisible(false); } });
+    this.miniEnemies = [];
     this.physics.pause();
     this.soundGen.play('victory');
 
@@ -1405,12 +1484,28 @@ export default class IceBossScene extends Phaser.Scene {
     }
   }
 
+  handleClonMelee(hitX, hitY) {
+    if (this.gameOver || this.gameWon) return;
+    this.soundGen.play('hit');
+    if (this.iceBoss && this.iceBoss.active) {
+      const dist = Phaser.Math.Distance.Between(hitX, hitY, this.iceBoss.x, this.iceBoss.y);
+      if (dist < 90) {
+        this.iceBoss.takeDamage();
+        if (this.healthText) this.healthText.setText(`Ice Boss: ${this.iceBoss.health}`);
+        const impact = this.add.circle(this.iceBoss.x, this.iceBoss.y, 30, 0x00FF00, 0.7);
+        this.tweens.add({ targets: impact, alpha: 0, scale: 2, duration: 300, onComplete: () => impact.destroy() });
+      }
+    }
+  }
+
   createTorbellino(x, y, flipX) {
     if (this.gameOver || this.gameWon) return;
 
     const torb = this.torbellinos.get(x, y);
     if (torb) {
       torb.fire(x, y, flipX ? -1 : 1);
+      torb.setScale(3.5);
+      torb.body.setSize(torb.width * 0.8, torb.height * 0.8);
     }
     this.soundGen.play('shoot');
   }
@@ -1426,8 +1521,8 @@ export default class IceBossScene extends Phaser.Scene {
 
     this.soundGen.play('hit');
 
-    // El torbellino hace 3 de daño
-    for (let i = 0; i < 3; i++) {
+    // El torbellino hace 10 de daño
+    for (let i = 0; i < 10; i++) {
       if (boss.active) boss.takeDamage();
     }
 
@@ -1586,6 +1681,17 @@ export default class IceBossScene extends Phaser.Scene {
 
       if (this.dragonAuraCircle && this.dragonAuraCircle.active && this.dolphin && this.dolphin.active) {
         this.dragonAuraCircle.setPosition(this.dolphin.x, this.dolphin.y);
+      }
+
+      // Mover mini-enemigos hacia el jugador
+      if (this.miniEnemies && this.dolphin && this.dolphin.active) {
+        this.miniEnemies.forEach(e => {
+          if (!e.active) return;
+          const dx = this.dolphin.x - e.x;
+          const dy = this.dolphin.y - e.y;
+          const len = Math.sqrt(dx * dx + dy * dy);
+          if (len > 0) { e.setVelocity((dx / len) * 120, (dy / len) * 120); }
+        });
       }
 
       // Actualizar nieve

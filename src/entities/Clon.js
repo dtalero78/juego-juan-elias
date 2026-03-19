@@ -19,8 +19,8 @@ export default class Clon extends Phaser.Physics.Arcade.Sprite {
     // Personaje terrestre con gravedad
     this.body.setAllowGravity(true);
 
-    this.speed = 210;
-    this.jumpForce = -480;
+    this.speed = 600;
+    this.jumpForce = -900;
 
     this.isPvPMode = isPvPMode;
 
@@ -28,23 +28,31 @@ export default class Clon extends Phaser.Physics.Arcade.Sprite {
       this.health = 100;
       this.maxHealth = 100;
     } else {
-      this.health = 4;
-      this.maxHealth = 4;
+      this.health = 2;
+      this.maxHealth = 2;
     }
 
     this.invulnerable = false;
-    this.invulnerabilityTime = 1000;
+    this.invulnerabilityTime = 300;
 
-    // Ataque: lanza torbellinos
+    // Modo de ataque: 'torbellino' o 'melee'
+    this.attackMode = 'torbellino';
+
+    // Ataque: lanza torbellinos gigantes
     this.canShoot = true;
-    this.shootCooldown = 400;
+    this.shootCooldown = 10000;
+
+    // Melee
+    this.canMelee = true;
+    this.isMeleeActive = false;
+    this.meleeCooldown = 400;
 
     // Dash
     this.canDash = true;
     this.isDashing = false;
-    this.dashSpeed = 650;
-    this.dashDuration = 200;
-    this.dashCooldown = 800;
+    this.dashSpeed = 2000;
+    this.dashDuration = 150;
+    this.dashCooldown = 200;
 
     this.currentSpriteState = 'idle';
   }
@@ -71,9 +79,19 @@ export default class Clon extends Phaser.Physics.Arcade.Sprite {
       this.scene.events.emit('clonJump');
     }
 
-    // Disparar torbellino
-    if (Phaser.Input.Keyboard.JustDown(spaceBar) && this.canShoot) {
-      this.shootTorbellino();
+    // Q: alternar modo de ataque
+    if (qKey && Phaser.Input.Keyboard.JustDown(qKey)) {
+      this.attackMode = this.attackMode === 'torbellino' ? 'melee' : 'torbellino';
+      this.scene.events.emit('clonModeChange', this.attackMode);
+    }
+
+    // ESPACIO: atacar según modo
+    if (Phaser.Input.Keyboard.JustDown(spaceBar)) {
+      if (this.attackMode === 'torbellino' && this.canShoot) {
+        this.shootTorbellino();
+      } else if (this.attackMode === 'melee' && this.canMelee && !this.isMeleeActive) {
+        this.meleeAttack();
+      }
     }
 
     // Dash
@@ -100,6 +118,33 @@ export default class Clon extends Phaser.Physics.Arcade.Sprite {
     this.scene.time.delayedCall(this.shootCooldown, () => {
       this.canShoot = true;
     });
+  }
+
+  meleeAttack() {
+    this.canMelee = false;
+    this.isMeleeActive = true;
+
+    const dir = this.flipX ? -1 : 1;
+    const hitX = this.x + dir * 60;
+    const hitY = this.y;
+
+    // Efecto visual: arco verde
+    const slash = this.scene.add.graphics();
+    slash.lineStyle(6, 0x00FF00, 1);
+    slash.beginPath();
+    slash.arc(this.x + dir * 20, this.y, 50, Phaser.Math.DegToRad(dir > 0 ? -70 : 110), Phaser.Math.DegToRad(dir > 0 ? 70 : 250), false);
+    slash.strokePath();
+    this.scene.tweens.add({
+      targets: slash,
+      alpha: 0,
+      duration: 200,
+      onComplete: () => slash.destroy()
+    });
+
+    this.scene.events.emit('clonMelee', hitX, hitY, this);
+
+    this.scene.time.delayedCall(200, () => { this.isMeleeActive = false; });
+    this.scene.time.delayedCall(this.meleeCooldown, () => { this.canMelee = true; });
   }
 
   dash() {
