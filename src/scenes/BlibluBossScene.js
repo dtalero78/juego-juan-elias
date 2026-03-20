@@ -94,9 +94,9 @@ export default class BlibluBossScene extends Phaser.Scene {
     this.qKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.Q);
 
     // Limpiar solo los eventos del juego para evitar acumulación al reiniciar
-    ['dolphinShoot','blibluDied','blibluSlam','blibluRage','dolphinJump','dolphinDash',
-     'colombiaJump','colombiaDash','colombiaPunch','colombiaSpecial','colombiaAttack','colombiaEnergyBall',
-     'triangleJump','triangleDash','triangleShoot','triangleShield','triangleFireball',
+    ['dolphinShoot','blibluDied','blibluSlam','blibluRage','dolphinJump','dolphinDash','dolphinFrenzy',
+     'colombiaJump','colombiaDash','colombiaPunch','colombiaSpecial','colombiaAttack','colombiaEnergyBall','colombiaKnifeSlash','colombiaModeChange',
+     'triangleJump','triangleDash','triangleShoot','triangleShield','triangleFireball','triangleMegaFireball',
      'clonJump','clonDash','clonShoot','clonMelee','clonModeChange',
      'perritoJump','perritoDash','perritoMagnet','perritoMelee','perritoModeChange'
     ].forEach(e => this.events.off(e));
@@ -105,23 +105,39 @@ export default class BlibluBossScene extends Phaser.Scene {
     this.events.on('dolphinShoot', this.createBullet, this);
     this.events.on('dolphinJump', () => this.soundGen.play('jump'), this);
     this.events.on('dolphinDash', () => this.soundGen.play('dash'), this);
+    this.events.on('dolphinFrenzy', (active) => {
+      if (!active) return;
+      this.soundGen.play('shootFire');
+      const txt = this.add.text(400, 260, '⚡ FRENESI ⚡', { fontSize: '30px', fill: '#00FFFF', fontFamily: 'Courier New', fontStyle: 'bold', stroke: '#003333', strokeThickness: 5 }).setOrigin(0.5).setDepth(20);
+      this.tweens.add({ targets: txt, y: 195, alpha: 0, duration: 1800, ease: 'Cubic.easeOut', onComplete: () => txt.destroy() });
+      const flash = this.add.rectangle(400, 325, 800, 650, 0x00FFFF, 0.15).setDepth(19);
+      this.tweens.add({ targets: flash, alpha: 0, duration: 380, onComplete: () => flash.destroy() });
+    }, this);
     this.events.on('colombiaJump', () => this.soundGen.play('jump'), this);
     this.events.on('colombiaDash', () => this.soundGen.play('dash'), this);
     this.events.on('colombiaPunch', () => this.soundGen.play('hit'), this);
     this.events.on('colombiaSpecial', () => this.soundGen.play('shootFire'), this);
     this.events.on('colombiaAttack', this.handleColombiaAttack, this);
     this.events.on('colombiaEnergyBall', this.handleColombiaEnergyBall, this);
+    this.events.on('colombiaKnifeSlash', (x, y, velX, velY, angle, chargeLevel, scale) => this.createColombiaKnife(x, y, velX, velY, angle, chargeLevel, scale), this);
+    this.events.on('colombiaModeChange', (mode) => {
+      if (this.ammoText) this.ammoText.setText(mode === 'knife' ? 'ESPACIO: Cuchillazo (WASD apunta) | Q: cambiar | X: Dash' : 'ESPACIO: Combo → Bola de energía | Q: cambiar | X: Dash');
+    }, this);
     this.events.on('triangleJump', () => this.soundGen.play('jump'), this);
     this.events.on('triangleDash', () => this.soundGen.play('dash'), this);
     this.events.on('triangleShoot', () => this.soundGen.play('shootFire'), this);
     this.events.on('triangleShield', () => this.soundGen.play('pickup'), this);
     this.events.on('triangleFireball', this.createBigFireball, this);
+    this.events.on('triangleMegaFireball', this.createMegaFireball, this);
     this.events.on('clonJump', () => this.soundGen.play('jump'), this);
     this.events.on('clonDash', () => this.soundGen.play('dash'), this);
     this.events.on('clonShoot', (x, y, flipX) => this.createClonPlasma(x, y, flipX), this);
     this.events.on('clonMelee', this.handleClonMelee, this);
     this.events.on('clonModeChange', (mode) => {
-      if (this.ammoText) this.ammoText.setText(mode === 'melee' ? 'ESPACIO: Golpe | Q: cambiar | X: Dash' : 'ESPACIO: Plasma Nova | Q: cambiar | X: Dash');
+      if (this.ammoText) this.ammoText.setText(mode === 'melee' ? 'ESPACIO: Golpe | Q: cambiar | X: Dash' : `ESPACIO: Plasma Nova (${this.player?.plasmaShots ?? 3}/3) | Q: cambiar | X: Dash`);
+    }, this);
+    this.events.on('clonPlasmaShots', (shots) => {
+      if (this.ammoText) this.ammoText.setText(`ESPACIO: Plasma Nova (${shots}/3) | Q: cambiar | X: Dash`);
     }, this);
     this.events.on('blibluSlam', this.handleBrutusSlam, this);
     this.events.on('blibluRage', this.handleBrutusRage, this);
@@ -133,7 +149,7 @@ export default class BlibluBossScene extends Phaser.Scene {
       if (this.ammoText) {
         this.ammoText.setText(mode === 'melee'
           ? 'ESPACIO: Golpe | Q: cambiar | X: Dash'
-          : 'ESPACIO: Bola Magnética | Q: cambiar | X: Dash');
+          : 'ESPACIO: Tormenta Magnética (x3) | Q: cambiar | X: Dash');
         this.ammoText.setFill(mode === 'melee' ? '#FF8800' : '#FF00FF');
       }
     }, this);
@@ -217,8 +233,8 @@ export default class BlibluBossScene extends Phaser.Scene {
     });
 
     if (this.selectedCharacter === 'colombiaBall') {
-      this.ammoText = this.add.text(10, 35, 'Combo: 0/3 → Bola de energía', {
-        fontSize: '16px', fill: '#9400D3', fontFamily: 'Courier New',
+      this.ammoText = this.add.text(10, 35, 'ESPACIO: Combo → Bola de energía | Q: cambiar | X: Dash', {
+        fontSize: '12px', fill: '#FF6600', fontFamily: 'Courier New',
         backgroundColor: '#000000aa', padding: { x: 5, y: 2 }
       });
     } else if (this.selectedCharacter === 'redTriangle') {
@@ -227,12 +243,12 @@ export default class BlibluBossScene extends Phaser.Scene {
         backgroundColor: '#000000aa', padding: { x: 5, y: 2 }
       });
     } else if (this.selectedCharacter === 'clon') {
-      this.ammoText = this.add.text(10, 35, 'ESPACIO: Plasma Nova | Q: cambiar | X: Dash', {
+      this.ammoText = this.add.text(10, 35, 'ESPACIO: Plasma Nova (3/3) | Q: cambiar | X: Dash', {
         fontSize: '12px', fill: '#00AAFF', fontFamily: 'Courier New',
         backgroundColor: '#000000aa', padding: { x: 5, y: 2 }
       });
     } else if (this.selectedCharacter === 'perrito') {
-      this.ammoText = this.add.text(10, 35, 'ESPACIO: Bola Magnética | Q: cambiar | X: Dash', {
+      this.ammoText = this.add.text(10, 35, 'ESPACIO: Tormenta Magnética (x3) | Q: cambiar | X: Dash', {
         fontSize: '12px', fill: '#FF00FF', fontFamily: 'Courier New',
         backgroundColor: '#000000aa', padding: { x: 5, y: 2 }
       });
@@ -278,29 +294,54 @@ export default class BlibluBossScene extends Phaser.Scene {
 
   // ── Proyectiles del jugador ──
 
-  createBullet(x, y, bulletType) {
+  createBullet(x, y, bulletType, flipX) {
     if (this.gameOver || this.gameWon) return;
-    this.soundGen.play('shoot');
 
-    const config = { normal: 400, fire: 450, ice: 350, fast: 800, triple: 400, xmas: 380 };
-    const speed = config[bulletType] || 400;
+    const dir = flipX ? -1 : 1;
+    const bx = x + dir * 10;
 
-    if (bulletType === 'triple') {
-      [-25, 0, 25].forEach(ang => {
-        const b = this.bullets.get(x, y, 'bullet');
-        if (!b) return;
-        b.setActive(true); b.setVisible(true); b.body.reset(x, y);
-        const rad = Phaser.Math.DegToRad(ang);
-        b.setVelocity(Math.cos(rad) * speed, Math.sin(rad) * speed);
-        b.damage = 1; b.bulletType = bulletType;
-      });
+    if (bulletType === 'fire') this.soundGen.play('shootFire');
+    else if (bulletType === 'ice') this.soundGen.play('shootIce');
+    else this.soundGen.play('shoot');
+
+    if (bulletType === 'normal') {
+      const b = this.bullets.get(bx, y, 'bullet');
+      if (b) { b.setActive(true); b.setVisible(true); b.body.reset(bx, y); b.setVelocityX(520 * dir); b.body.allowGravity = false; b.damage = 4; b.bulletType = 'normal'; b.setScale(1.2);
+        const t = this.time.addEvent({ delay: 30, callback: () => { if (!b.active) { t.remove(); return; } const p = this.add.circle(b.x, b.y, Phaser.Math.Between(3,7), 0x00FFFF, 0.7); this.tweens.add({ targets: p, scale: 0, alpha: 0, duration: 200, onComplete: () => p.destroy() }); }, loop: true }); }
+    } else if (bulletType === 'fire') {
+      const b = this.bullets.get(bx, y, 'fireBullet');
+      if (b) { b.setActive(true); b.setVisible(true); b.body.reset(bx, y); b.setVelocityX(500 * dir); b.body.allowGravity = false; b.damage = 4; b.bulletType = 'fire'; b.setScale(1.1);
+        this.tweens.add({ targets: b, scale: 1.6, duration: 800, ease: 'Quad.easeIn' });
+        const t = this.time.addEvent({ delay: 28, callback: () => { if (!b.active) { t.remove(); return; } const p = this.add.circle(b.x, b.y, Phaser.Math.Between(5,11), Phaser.Math.RND.pick([0xFF4400,0xFF8800,0xFFCC00]), 0.8); this.tweens.add({ targets: p, scale: 0, alpha: 0, duration: 240, onComplete: () => p.destroy() }); }, loop: true }); }
+    } else if (bulletType === 'ice') {
+      const b = this.bullets.get(bx, y, 'iceBullet');
+      if (b) { b.setActive(true); b.setVisible(true); b.body.reset(bx, y); b.setVelocityX(370 * dir); b.body.allowGravity = false; b.damage = 2; b.bulletType = 'ice'; b.slowEffect = true; b.setScale(1.8); b.setTint(0xADD8E6);
+        this.tweens.add({ targets: b, alpha: 0.55, scaleX: 2.1, scaleY: 1.5, duration: 220, yoyo: true, repeat: -1 }); }
+    } else if (bulletType === 'triple') {
+      const angles = [-38, -18, 0, 18, 38]; const speeds = [390, 420, 450, 420, 390];
+      angles.forEach((ang, i) => { this.time.delayedCall(i * 40, () => {
+        const b = this.bullets.get(bx, y, 'tripleBullet');
+        if (!b) return; b.setActive(true); b.setVisible(true); b.body.reset(bx, y); b.damage = 2; b.bulletType = 'triple'; b.setScale(1.1); b.body.allowGravity = false;
+        const rad = Phaser.Math.DegToRad(ang); b.setVelocity(Math.cos(rad) * speeds[i] * dir, Math.sin(rad) * speeds[i]);
+        this.tweens.add({ targets: b, scale: 1.4, duration: 180, yoyo: true, repeat: -1 });
+      }); });
+      const fan = this.add.circle(bx, y, 14, 0xFFFF00, 0.8); this.tweens.add({ targets: fan, scale: 3, alpha: 0, duration: 250, onComplete: () => fan.destroy() });
+    } else if (bulletType === 'fast') {
+      const b = this.bullets.get(bx, y, 'fastBullet');
+      if (b) { b.setActive(true); b.setVisible(true); b.body.reset(bx, y); b.setVelocityX(1050 * dir); b.body.allowGravity = false; b.damage = 2; b.bulletType = 'fast'; b.setScale(0.85); b.setTint(0xFFFF44);
+        const t = this.time.addEvent({ delay: 18, callback: () => { if (!b.active) { t.remove(); return; } const p = this.add.circle(b.x, b.y, Phaser.Math.Between(3,8), 0xFFFF00, 0.9); this.tweens.add({ targets: p, scaleX: 4, scaleY: 0.3, alpha: 0, duration: 160, onComplete: () => p.destroy() }); }, loop: true }); }
+    } else if (bulletType === 'teleport') {
+      const b = this.bullets.get(bx, y, 'teleportBullet');
+      if (b) { b.setActive(true); b.setVisible(true); b.body.reset(bx, y); b.setVelocity(370 * dir, -180); b.damage = 0; b.bulletType = 'teleport'; b.isTeleport = true; b.body.allowGravity = true; b.body.setGravityY(300); b.setScale(1.4);
+        this.tweens.add({ targets: b, alpha: 0.4, scale: 1.8, duration: 130, yoyo: true, repeat: -1 }); }
+    } else if (bulletType === 'xmas') {
+      const b = this.bullets.get(bx, y, 'xmasBullet');
+      if (b) { b.setActive(true); b.setVisible(true); b.body.reset(bx, y); b.setVelocityX(400 * dir); b.body.allowGravity = false; b.damage = 6; b.bulletType = 'xmas'; b.isXmas = true; b.setScale(1.3);
+        this.tweens.add({ targets: b, rotation: Math.PI * 2, duration: 450, repeat: -1 });
+        this.tweens.add({ targets: b, scale: 1.7, duration: 200, yoyo: true, repeat: -1 }); }
     } else {
-      const b = this.bullets.get(x, y, 'bullet');
-      if (!b) return;
-      b.setActive(true); b.setVisible(true); b.body.reset(x, y);
-      b.setVelocityX(speed);
-      b.damage = bulletType === 'fire' ? 4 : bulletType === 'xmas' ? 6 : 3;
-      b.bulletType = bulletType;
+      const b = this.bullets.get(bx, y, 'bullet');
+      if (b) { b.setActive(true); b.setVisible(true); b.body.reset(bx, y); b.setVelocityX(520 * dir); b.body.allowGravity = false; b.damage = 4; b.bulletType = bulletType; }
     }
 
     this.updateAmmoUI();
@@ -319,6 +360,36 @@ export default class BlibluBossScene extends Phaser.Scene {
       for (let i = 0; i < 6; i++) this.boss.takeDamage();
       this.updateBossHealthUI();
       this.soundGen.play('explosion');
+    });
+    this.time.delayedCall(3000, () => { if (fb && fb.active) fb.destroy(); });
+  }
+
+  createMegaFireball(x, y, flipX) {
+    if (this.gameOver || this.gameWon) return;
+    const dir = flipX ? -1 : 1;
+    const fb = this.physics.add.image(x, y, 'bigFireball');
+    fb.body.allowGravity = false;
+    fb.setVelocityX(dir * 720);
+    fb.setScale(2.4);
+    fb.setTint(0xFFFFAA);
+    this.tweens.add({ targets: fb, scale: 2.9, duration: 90, yoyo: true, repeat: -1 });
+    this.physics.add.overlap(this.boss, fb, () => {
+      if (!fb.active || !this.boss.active) return;
+      fb.destroy();
+      for (let i = 0; i < 20; i++) this.boss.takeDamage();
+      this.updateBossHealthUI();
+      const boom = this.add.circle(fb.x, fb.y, 30, 0xFF4400, 0.9);
+      this.tweens.add({ targets: boom, scale: 5, alpha: 0, duration: 500, onComplete: () => boom.destroy() });
+      this.soundGen.play('explosion');
+    });
+    const trail = this.time.addEvent({
+      delay: 25,
+      callback: () => {
+        if (!fb.active) { trail.remove(); return; }
+        const p = this.add.circle(fb.x, fb.y, Phaser.Math.Between(8, 20), Phaser.Math.RND.pick([0xFF2200, 0xFF6600, 0xFFFF00]), 0.8);
+        this.tweens.add({ targets: p, scale: 0, alpha: 0, duration: 250, onComplete: () => p.destroy() });
+      },
+      loop: true
     });
     this.time.delayedCall(3000, () => { if (fb && fb.active) fb.destroy(); });
   }
@@ -433,6 +504,69 @@ export default class BlibluBossScene extends Phaser.Scene {
     });
   }
 
+  createColombiaKnife(x, y, velX, velY, angle, chargeLevel = 0, knifeScale = 1.6) {
+    if (this.gameOver || this.gameWon || !this.boss || !this.boss.active) return;
+
+    const isSuperCharge = chargeLevel >= 10;
+    const burnTicks = isSuperCharge ? 0 : Math.floor(2 + chargeLevel * 0.5);
+
+    const knife = this.physics.add.image(x, y, 'colombiaKnife');
+    knife.setAngle(angle);
+    knife.body.allowGravity = false;
+    knife.setVelocity(velX, velY);
+    knife.setScale(knifeScale);
+    if (isSuperCharge) knife.setTint(0xFFFFFF);
+
+    const emberColor = isSuperCharge ? 0xFFFF00 : 0xFF4400;
+    this.time.addEvent({
+      delay: 25,
+      callback: () => {
+        if (!knife.active) return;
+        const ember = this.add.circle(knife.x, knife.y, Phaser.Math.Between(isSuperCharge ? 8 : 4, isSuperCharge ? 16 : 9), emberColor, 0.8);
+        this.tweens.add({ targets: ember, scale: 0, alpha: 0, duration: 220, onComplete: () => ember.destroy() });
+      },
+      loop: true, repeat: 40
+    });
+
+    this.physics.add.overlap(knife, this.boss, () => {
+      if (!this.boss.active || !knife.active) return;
+      const bx = this.boss.x, by = this.boss.y;
+      knife.destroy();
+      this.soundGen.play('hit');
+
+      if (isSuperCharge) {
+        this.cameras.main.shake(300, 0.018);
+        const boom = this.add.circle(bx, by, 10, 0xFFFF00, 1);
+        this.tweens.add({ targets: boom, scale: 14, alpha: 0, duration: 600, onComplete: () => boom.destroy() });
+        const fire = this.add.circle(bx, by, 5, 0xFF4400, 0.9);
+        this.tweens.add({ targets: fire, scale: 12, alpha: 0, duration: 800, onComplete: () => fire.destroy() });
+        for (let i = 0; i < 12; i++) {
+          const spark = this.add.circle(bx + Phaser.Math.Between(-80,80), by + Phaser.Math.Between(-80,80), Phaser.Math.Between(6,16), 0xFF6600, 0.9);
+          this.tweens.add({ targets: spark, scale: 0, alpha: 0, duration: Phaser.Math.Between(400,700), onComplete: () => spark.destroy() });
+        }
+        for (let i = 0; i < 15; i++) { if (this.boss.active) this.boss.takeDamage(); }
+        this.updateBossHealthUI();
+      } else {
+        this.boss.takeDamage();
+        this.updateBossHealthUI();
+        const burn = this.add.circle(bx, by, 25, 0xFF4400, 0.85);
+        this.tweens.add({ targets: burn, scale: 2.5, alpha: 0, duration: 350, onComplete: () => burn.destroy() });
+        for (let i = 1; i <= burnTicks; i++) {
+          this.time.delayedCall(i * 500, () => {
+            if (this.boss && this.boss.active) {
+              this.boss.takeDamage();
+              this.updateBossHealthUI();
+              const dot = this.add.circle(this.boss.x, this.boss.y, 12, 0xFF6600, 0.7);
+              this.tweens.add({ targets: dot, scale: 2, alpha: 0, duration: 250, onComplete: () => dot.destroy() });
+            }
+          });
+        }
+      }
+    });
+
+    this.time.delayedCall(2000, () => { if (knife.active) knife.destroy(); });
+  }
+
   handlePerritoMelee(hitX, hitY, perrito) {
     if (this.gameOver || this.gameWon || !this.boss || !this.boss.active) return;
     this.soundGen.play('hit');
@@ -506,10 +640,7 @@ export default class BlibluBossScene extends Phaser.Scene {
   // ── Ammo / powerups ──
 
   updateAmmoUI() {
-    if (this.selectedCharacter === 'colombiaBall') {
-      this.ammoText && this.ammoText.setText(`Combo: ${this.player.comboCount || 0}/3 → Bola de energía`);
-      return;
-    }
+    if (this.selectedCharacter === 'colombiaBall') return; // handled by colombiaModeChange event
     if (this.selectedCharacter === 'clon' || this.selectedCharacter === 'perrito') return;
     if (!this.dolphin.ammo) return;
     const typeNames = { normal: 'Normal', fire: 'Fuego', ice: 'Hielo', triple: 'Triple', fast: 'Rápida', xmas: 'Navidad' };
@@ -686,6 +817,7 @@ export default class BlibluBossScene extends Phaser.Scene {
     this.events.off('colombiaAttack');
     this.events.off('colombiaEnergyBall');
     this.events.off('triangleFireball');
+    this.events.off('triangleMegaFireball');
     this.events.off('clonShoot');
     this.events.off('perritoMagnet');
     this.events.off('perritoMelee');

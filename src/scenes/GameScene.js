@@ -110,9 +110,9 @@ export default class GameScene extends Phaser.Scene {
     this.xKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.X);
 
     // Limpiar solo los eventos del juego para evitar acumulación al reiniciar
-    ['dolphinShoot','octopusShoot','octopusDied','dolphinJump','dolphinDash',
-     'colombiaJump','colombiaDash','colombiaPunch','colombiaSpecial','colombiaAttack','colombiaEnergyBall',
-     'triangleJump','triangleDash','triangleShoot','triangleShield','triangleFireball',
+    ['dolphinShoot','octopusShoot','octopusDied','dolphinJump','dolphinDash','dolphinFrenzy',
+     'colombiaJump','colombiaDash','colombiaPunch','colombiaSpecial','colombiaAttack','colombiaEnergyBall','colombiaKnifeSlash','colombiaModeChange',
+     'triangleJump','triangleDash','triangleShoot','triangleShield','triangleFireball','triangleMegaFireball',
      'clonJump','clonDash','clonShoot','clonMelee','clonModeChange',
      'perritoJump','perritoDash','perritoMagnet','perritoMelee','perritoModeChange'
     ].forEach(e => this.events.off(e));
@@ -123,6 +123,18 @@ export default class GameScene extends Phaser.Scene {
     this.events.on('octopusDied', this.handleVictory, this);
     this.events.on('dolphinJump', () => this.soundGen.play('jump'), this);
     this.events.on('dolphinDash', () => this.soundGen.play('dash'), this);
+    this.events.on('dolphinFrenzy', (active) => {
+      if (active) {
+        this.soundGen.play('shootFire');
+        const txt = this.add.text(400, 260, '⚡ FRENESI ⚡', {
+          fontSize: '30px', fill: '#00FFFF', fontFamily: 'Courier New', fontStyle: 'bold',
+          stroke: '#003333', strokeThickness: 5
+        }).setOrigin(0.5).setDepth(20);
+        this.tweens.add({ targets: txt, y: 195, alpha: 0, duration: 1800, ease: 'Cubic.easeOut', onComplete: () => txt.destroy() });
+        const flash = this.add.rectangle(400, 325, 800, 650, 0x00FFFF, 0.15).setDepth(19);
+        this.tweens.add({ targets: flash, alpha: 0, duration: 380, onComplete: () => flash.destroy() });
+      }
+    }, this);
 
     // Eventos para Colombia Ball
     this.events.on('colombiaJump', () => this.soundGen.play('jump'), this);
@@ -131,6 +143,10 @@ export default class GameScene extends Phaser.Scene {
     this.events.on('colombiaSpecial', () => this.soundGen.play('shootFire'), this);
     this.events.on('colombiaAttack', this.handleColombiaAttack, this);
     this.events.on('colombiaEnergyBall', this.handleColombiaEnergyBall, this);
+    this.events.on('colombiaKnifeSlash', (x, y, velX, velY, angle, chargeLevel, scale) => this.createColombiaKnife(x, y, velX, velY, angle, chargeLevel, scale), this);
+    this.events.on('colombiaModeChange', (mode) => {
+      if (this.ammoText) this.ammoText.setText(mode === 'knife' ? 'ESPACIO: Cuchillazo (WASD apunta) | Q: cambiar | X: Dash' : 'ESPACIO: Combo → Bola de energía | Q: cambiar | X: Dash');
+    }, this);
 
     // Eventos para Red Triangle
     this.events.on('triangleJump', () => this.soundGen.play('jump'), this);
@@ -138,6 +154,7 @@ export default class GameScene extends Phaser.Scene {
     this.events.on('triangleShoot', () => this.soundGen.play('shootFire'), this);
     this.events.on('triangleShield', () => this.soundGen.play('pickup'), this);
     this.events.on('triangleFireball', this.createBigFireball, this);
+    this.events.on('triangleMegaFireball', this.createMegaFireball, this);
 
     // Eventos para Clon
     this.events.on('clonJump', () => this.soundGen.play('jump'), this);
@@ -147,7 +164,10 @@ export default class GameScene extends Phaser.Scene {
     }, this);
     this.events.on('clonMelee', this.handleClonMelee, this);
     this.events.on('clonModeChange', (mode) => {
-      if (this.ammoText) this.ammoText.setText(mode === 'melee' ? 'ESPACIO: Golpe | Q: cambiar | X: Dash' : 'ESPACIO: Plasma Nova | Q: cambiar | X: Dash');
+      if (this.ammoText) this.ammoText.setText(mode === 'melee' ? 'ESPACIO: Golpe | Q: cambiar | X: Dash' : `ESPACIO: Plasma Nova (${this.player?.plasmaShots ?? 3}/3) | Q: cambiar | X: Dash`);
+    }, this);
+    this.events.on('clonPlasmaShots', (shots) => {
+      if (this.ammoText) this.ammoText.setText(`ESPACIO: Plasma Nova (${shots}/3) | Q: cambiar | X: Dash`);
     }, this);
 
     // Eventos para Perrito
@@ -161,7 +181,7 @@ export default class GameScene extends Phaser.Scene {
           this.ammoText.setText('ESPACIO: Golpe | Q: cambiar | X: Dash');
           this.ammoText.setFill('#FF8800');
         } else {
-          this.ammoText.setText('ESPACIO: Bola Magnética | Q: cambiar | X: Dash');
+          this.ammoText.setText('ESPACIO: Tormenta Magnética (x3) | Q: cambiar | X: Dash');
           this.ammoText.setFill('#FF00FF');
         }
       }
@@ -215,9 +235,17 @@ export default class GameScene extends Phaser.Scene {
           // Activar escudo de tarjetas
           this.dolphin.activateShield();
         } else if (this.selectedCharacter !== 'colombiaBall' && this.selectedCharacter !== 'clon' && this.selectedCharacter !== 'perrito') {
-          // perrito maneja Q internamente en su update()
-          this.dolphin.nextBulletType();
+          const newType = this.dolphin.nextBulletType();
           this.updateAmmoUI();
+          // Anuncio de cambio de bala
+          const typeColors = { normal: '#00FFFF', fire: '#FF6600', ice: '#ADD8E6', triple: '#FFFF00', fast: '#FFFF44', teleport: '#CC00FF', xmas: '#FF3333' };
+          const typeNames = { normal: 'NORMAL', fire: 'FUEGO', ice: 'HIELO', triple: 'TRIPLE', fast: 'RAPIDA', teleport: 'TELE', xmas: 'NAVIDAD' };
+          const col = typeColors[newType] || '#FFFFFF';
+          const ann = this.add.text(this.dolphin.x, this.dolphin.y - 30, `[ ${typeNames[newType] || newType.toUpperCase()} ]`, {
+            fontSize: '18px', fill: col, fontFamily: 'Courier New', fontStyle: 'bold',
+            stroke: '#000000', strokeThickness: 3
+          }).setOrigin(0.5).setDepth(20);
+          this.tweens.add({ targets: ann, y: ann.y - 50, alpha: 0, duration: 900, ease: 'Cubic.easeOut', onComplete: () => ann.destroy() });
         }
       }
     });
@@ -296,9 +324,9 @@ export default class GameScene extends Phaser.Scene {
 
     // Munición o info según personaje
     if (this.selectedCharacter === 'colombiaBall') {
-      this.ammoText = this.add.text(10, 35, 'Combo: 0/3 → Bola de energía', {
+      this.ammoText = this.add.text(10, 35, 'ESPACIO: Combo → Bola de energía | Q: cambiar | X: Dash', {
         fontSize: smallFontSize,
-        fill: '#9400D3',
+        fill: '#FF6600',
         fontFamily: 'Courier New',
         backgroundColor: '#000000aa',
         padding: { x: 5, y: 2 }
@@ -312,7 +340,7 @@ export default class GameScene extends Phaser.Scene {
         padding: { x: 5, y: 2 }
       });
     } else if (this.selectedCharacter === 'clon') {
-      this.ammoText = this.add.text(10, 35, 'ESPACIO: Plasma Nova | Q: cambiar | X: Dash', {
+      this.ammoText = this.add.text(10, 35, 'ESPACIO: Plasma Nova (3/3) | Q: cambiar | X: Dash', {
         fontSize: smallFontSize,
         fill: '#00AAFF',
         fontFamily: 'Courier New',
@@ -320,7 +348,7 @@ export default class GameScene extends Phaser.Scene {
         padding: { x: 5, y: 2 }
       });
     } else if (this.selectedCharacter === 'perrito') {
-      this.ammoText = this.add.text(10, 35, 'ESPACIO: Bola Magnética | Q: cambiar | X: Dash', {
+      this.ammoText = this.add.text(10, 35, 'ESPACIO: Tormenta Magnética (x3) | Q: cambiar | X: Dash', {
         fontSize: smallFontSize,
         fill: '#FF00FF',
         fontFamily: 'Courier New',
@@ -375,108 +403,164 @@ export default class GameScene extends Phaser.Scene {
     this.restartText.setVisible(false);
   }
 
-  createBullet(x, y, bulletType) {
-    if (!this.gameOver && !this.gameWon) {
-      // Sonido según tipo de bala
-      if (bulletType === 'fire') {
-        this.soundGen.play('shootFire');
-      } else if (bulletType === 'ice') {
-        this.soundGen.play('shootIce');
-      } else {
-        this.soundGen.play('shoot');
+  createBullet(x, y, bulletType, flipX, _char, frenzyMult = 1) {
+    if (this.gameOver || this.gameWon) return;
+
+    const dir = flipX ? -1 : 1;
+    const bx = x + dir * 10;
+    const dmgScale = frenzyMult || 1;
+
+    if (bulletType === 'fire') this.soundGen.play('shootFire');
+    else if (bulletType === 'ice') this.soundGen.play('shootIce');
+    else this.soundGen.play('shoot');
+
+    // ── NORMAL: rápida con estela cian ───────────────────────────────────────
+    if (bulletType === 'normal') {
+      const bullet = this.bullets.get(bx, y, 'bullet');
+      if (bullet) {
+        bullet.setActive(true); bullet.setVisible(true); bullet.body.reset(bx, y);
+        bullet.setVelocityX(520 * dir); bullet.body.allowGravity = false;
+        bullet.damage = Math.round(4 * dmgScale); bullet.bulletType = 'normal';
+        bullet.setScale(dmgScale > 1 ? 1.5 : 1.2);
+        // Estela cian continua
+        const trail = this.time.addEvent({ delay: 30, callback: () => {
+          if (!bullet.active) { trail.remove(); return; }
+          const p = this.add.circle(bullet.x, bullet.y, Phaser.Math.Between(3,7), 0x00FFFF, 0.7);
+          this.tweens.add({ targets: p, scale: 0, alpha: 0, duration: 200, onComplete: () => p.destroy() });
+        }, loop: true });
       }
-
-      // Configuración según tipo de bala (normal es más fuerte)
-      const bulletConfig = {
-        normal: { texture: 'bullet', speed: 400, damage: 3 },
-        fire: { texture: 'fireBullet', speed: 450, damage: 2 },
-        ice: { texture: 'iceBullet', speed: 350, damage: 1, slow: true },
-        triple: { texture: 'tripleBullet', speed: 400, damage: 1, count: 3 },
-        fast: { texture: 'fastBullet', speed: 800, damage: 1 },
-        teleport: { texture: 'teleportBullet', speed: 350, damage: 0, isTeleport: true },
-        xmas: { texture: 'xmasBullet', speed: 380, damage: 5, isXmas: true }
-      };
-
-      const config = bulletConfig[bulletType] || bulletConfig.normal;
-
-      if (config.count === 3) {
-        // Disparo triple
-        [-30, 0, 30].forEach(angle => {
-          const bullet = this.bullets.get(x, y, config.texture);
-          if (bullet) {
-            bullet.setActive(true);
-            bullet.setVisible(true);
-            bullet.body.reset(x, y);
-            bullet.damage = config.damage;
-            bullet.bulletType = bulletType;
-            const rad = Phaser.Math.DegToRad(angle);
-            bullet.setVelocity(
-              Math.cos(rad) * config.speed,
-              Math.sin(rad) * config.speed
-            );
-          }
-        });
-      } else if (config.isTeleport) {
-        // Bala de teletransporte - viaja en arco
-        const bullet = this.bullets.get(x, y, config.texture);
-        if (bullet) {
-          bullet.setActive(true);
-          bullet.setVisible(true);
-          bullet.body.reset(x, y);
-          bullet.setVelocity(config.speed, -200); // Arco hacia arriba
-          bullet.damage = config.damage;
-          bullet.bulletType = bulletType;
-          bullet.isTeleport = true;
-          bullet.body.allowGravity = true;
-          bullet.body.setGravityY(300);
-          bullet.setScale(1.2);
-
-          // Efecto de brillo
-          this.tweens.add({
-            targets: bullet,
-            alpha: 0.5,
-            duration: 100,
-            yoyo: true,
-            repeat: -1
-          });
-        }
-      } else if (config.isXmas) {
-        // Bala navideña - esfera que explota con colores festivos
-        const bullet = this.bullets.get(x, y, config.texture);
-        if (bullet) {
-          bullet.setActive(true);
-          bullet.setVisible(true);
-          bullet.body.reset(x, y);
-          bullet.setVelocityX(config.speed);
-          bullet.damage = config.damage;
-          bullet.bulletType = bulletType;
-          bullet.isXmas = true;
-          bullet.setScale(1.0);
-
-          // Rotación festiva
-          this.tweens.add({
-            targets: bullet,
-            rotation: Math.PI * 2,
-            duration: 500,
-            repeat: -1
-          });
-        }
-      } else {
-        const bullet = this.bullets.get(x, y, config.texture);
-        if (bullet) {
-          bullet.setActive(true);
-          bullet.setVisible(true);
-          bullet.body.reset(x, y);
-          bullet.setVelocityX(config.speed);
-          bullet.damage = config.damage;
-          bullet.bulletType = bulletType;
-          bullet.slowEffect = config.slow || false;
-        }
-      }
-
-      // Actualizar UI de munición
-      this.updateAmmoUI();
     }
+
+    // ── FUEGO: deja rastro de llamas, se agranda al viajar ───────────────────
+    else if (bulletType === 'fire') {
+      const bullet = this.bullets.get(bx, y, 'fireBullet');
+      if (bullet) {
+        bullet.setActive(true); bullet.setVisible(true); bullet.body.reset(bx, y);
+        bullet.setVelocityX(500 * dir); bullet.body.allowGravity = false;
+        bullet.damage = Math.round(4 * dmgScale); bullet.bulletType = 'fire';
+        bullet.setScale(1.1);
+        this.tweens.add({ targets: bullet, scale: 1.6, duration: 800, ease: 'Quad.easeIn' });
+        // Trail de fuego + quemado por tiempo
+        const burnTicks = 3;
+        const trail = this.time.addEvent({ delay: 28, callback: () => {
+          if (!bullet.active) { trail.remove(); return; }
+          const p = this.add.circle(bullet.x, bullet.y, Phaser.Math.Between(5,11), Phaser.Math.RND.pick([0xFF4400,0xFF8800,0xFFCC00]), 0.8);
+          this.tweens.add({ targets: p, scale: 0, alpha: 0, duration: 240, onComplete: () => p.destroy() });
+        }, loop: true });
+      }
+    }
+
+    // ── HIELO: mega cristal con efecto de brillo frío ────────────────────────
+    else if (bulletType === 'ice') {
+      const bullet = this.bullets.get(bx, y, 'iceBullet');
+      if (bullet) {
+        bullet.setActive(true); bullet.setVisible(true); bullet.body.reset(bx, y);
+        bullet.setVelocityX(370 * dir); bullet.body.allowGravity = false;
+        bullet.damage = 2; bullet.bulletType = 'ice'; bullet.slowEffect = true;
+        bullet.setScale(1.8);
+        bullet.setTint(0xADD8E6);
+        this.tweens.add({ targets: bullet, alpha: 0.55, scaleX: 2.1, scaleY: 1.5, duration: 220, yoyo: true, repeat: -1 });
+        // Cristales orbitando
+        for (let i = 0; i < 4; i++) {
+          const baseAngle = (i / 4) * Math.PI * 2;
+          const orb = this.add.circle(bx, y, 4, 0xE0F8FF, 0.9);
+          const orbTimer = this.time.addEvent({ delay: 30, callback: () => {
+            if (!bullet.active || !orb.active) { orbTimer.remove(); if (orb.active) orb.destroy(); return; }
+            orb.x = bullet.x + Math.cos(baseAngle + this.time.now * 0.006) * 14;
+            orb.y = bullet.y + Math.sin(baseAngle + this.time.now * 0.006) * 14;
+          }, loop: true });
+          this.time.delayedCall(2500, () => { orbTimer.remove(); if (orb.active) orb.destroy(); });
+        }
+      }
+    }
+
+    // ── TRIPLE: 5 balas en abanico con desfase, pulsantes ───────────────────
+    else if (bulletType === 'triple') {
+      const angles = [-38, -18, 0, 18, 38];
+      const speeds = [390, 420, 450, 420, 390];
+      angles.forEach((angleDeg, i) => {
+        this.time.delayedCall(i * 40, () => {
+          const bullet = this.bullets.get(bx, y, 'tripleBullet');
+          if (!bullet) return;
+          bullet.setActive(true); bullet.setVisible(true); bullet.body.reset(bx, y);
+          bullet.damage = Math.round(2 * dmgScale); bullet.bulletType = 'triple';
+          bullet.setScale(1.1);
+          const rad = Phaser.Math.DegToRad(angleDeg);
+          bullet.setVelocity(Math.cos(rad) * speeds[i] * dir, Math.sin(rad) * speeds[i]);
+          bullet.body.allowGravity = false;
+          this.tweens.add({ targets: bullet, scale: 1.4, duration: 180, yoyo: true, repeat: -1 });
+        });
+      });
+      // Flash de abanico
+      const fan = this.add.circle(bx, y, 14, 0xFFFF00, 0.8);
+      this.tweens.add({ targets: fan, scale: 3, alpha: 0, duration: 250, onComplete: () => fan.destroy() });
+    }
+
+    // ── RÁPIDA: ultra veloz, rastro de relámpago ─────────────────────────────
+    else if (bulletType === 'fast') {
+      const bullet = this.bullets.get(bx, y, 'fastBullet');
+      if (bullet) {
+        bullet.setActive(true); bullet.setVisible(true); bullet.body.reset(bx, y);
+        bullet.setVelocityX(1050 * dir); bullet.body.allowGravity = false;
+        bullet.damage = 2; bullet.bulletType = 'fast';
+        bullet.setScale(0.85);
+        bullet.setTint(0xFFFF44);
+        // Relámpago estela
+        const trail = this.time.addEvent({ delay: 18, callback: () => {
+          if (!bullet.active) { trail.remove(); return; }
+          const p = this.add.circle(bullet.x, bullet.y, Phaser.Math.Between(3,8), 0xFFFF00, 0.9);
+          this.tweens.add({ targets: p, scaleX: 4, scaleY: 0.3, alpha: 0, duration: 160, onComplete: () => p.destroy() });
+        }, loop: true });
+      }
+    }
+
+    // ── TELETRANSPORTE: órbita de anillos, porta al boss ─────────────────────
+    else if (bulletType === 'teleport') {
+      const bullet = this.bullets.get(bx, y, 'teleportBullet');
+      if (bullet) {
+        bullet.setActive(true); bullet.setVisible(true); bullet.body.reset(bx, y);
+        bullet.setVelocity(370 * dir, -180);
+        bullet.damage = 0; bullet.bulletType = 'teleport';
+        bullet.isTeleport = true;
+        bullet.body.allowGravity = true;
+        bullet.body.setGravityY(300);
+        bullet.setScale(1.4);
+        this.tweens.add({ targets: bullet, alpha: 0.4, scale: 1.8, duration: 130, yoyo: true, repeat: -1 });
+        // 2 anillos pulsantes orbitando
+        for (let r = 0; r < 2; r++) {
+          const ring = this.add.graphics();
+          ring.lineStyle(2, 0xCC00FF, 1);
+          ring.strokeCircle(0, 0, 10 + r * 6);
+          const rt = this.time.addEvent({ delay: 20, callback: () => {
+            if (!bullet.active || !ring.active) { rt.remove(); if (ring.active) ring.destroy(); return; }
+            ring.setPosition(bullet.x, bullet.y);
+            ring.rotation += 0.12 + r * 0.08;
+          }, loop: true });
+          this.time.delayedCall(3000, () => { rt.remove(); if (ring.active) ring.destroy(); });
+        }
+      }
+    }
+
+    // ── XMAS: bola festiva que explota en 8 sub-balas ────────────────────────
+    else if (bulletType === 'xmas') {
+      const bullet = this.bullets.get(bx, y, 'xmasBullet');
+      if (bullet) {
+        bullet.setActive(true); bullet.setVisible(true); bullet.body.reset(bx, y);
+        bullet.setVelocityX(400 * dir); bullet.body.allowGravity = false;
+        bullet.damage = 6; bullet.bulletType = 'xmas'; bullet.isXmas = true;
+        bullet.setScale(1.3);
+        this.tweens.add({ targets: bullet, rotation: Math.PI * 2, duration: 450, repeat: -1 });
+        this.tweens.add({ targets: bullet, scale: 1.7, duration: 200, yoyo: true, repeat: -1 });
+        // Rastro de copos festivos
+        const sparkTimer = this.time.addEvent({ delay: 45, callback: () => {
+          if (!bullet.active) { sparkTimer.remove(); return; }
+          const p = this.add.circle(bullet.x, bullet.y, Phaser.Math.Between(4,9), Phaser.Math.RND.pick([0xFF3333,0x00CC44,0xFFFF00,0xFFFFFF]), 0.9);
+          this.tweens.add({ targets: p, scale: 0, alpha: 0, duration: 320, onComplete: () => p.destroy() });
+        }, loop: true });
+      }
+    }
+
+    this.updateAmmoUI();
   }
 
   createOctopusBullet(x, y, attackType = 'normal', angle = 0) {
@@ -532,6 +616,22 @@ export default class GameScene extends Phaser.Scene {
         }
       }
     }
+  }
+
+  // Homing suave para balas normales del jugador (se doblan hacia el boss)
+  updatePlayerHomingBullets() {
+    if (!this.octopus || !this.octopus.active) return;
+    this.bullets.getChildren().forEach(bullet => {
+      if (!bullet.active || bullet.bulletType !== 'normal') return;
+      const angle = Phaser.Math.Angle.Between(bullet.x, bullet.y, this.octopus.x, this.octopus.y);
+      const targetVX = Math.cos(angle) * 520;
+      const targetVY = Math.sin(angle) * 520;
+      // Lerp suave: 8% por frame hacia el objetivo
+      bullet.setVelocity(
+        bullet.body.velocity.x + (targetVX - bullet.body.velocity.x) * 0.08,
+        bullet.body.velocity.y + (targetVY - bullet.body.velocity.y) * 0.08
+      );
+    });
   }
 
   // Actualizar balas especiales del villano
@@ -1035,12 +1135,8 @@ export default class GameScene extends Phaser.Scene {
 
   // Actualizar UI de munición o combo
   updateAmmoUI() {
-    // Si es Colombia Ball, mostrar combo en lugar de munición
-    if (this.selectedCharacter === 'colombiaBall') {
-      const comboCount = this.player.comboCount || 0;
-      this.ammoText.setText(`Combo: ${comboCount}/3 → Bola de energía`);
-      return;
-    }
+    // Si es Colombia Ball, el texto se maneja via eventos
+    if (this.selectedCharacter === 'colombiaBall') return;
 
     // Clon no tiene munición variable
     if (this.selectedCharacter === 'clon') return;
@@ -1275,6 +1371,69 @@ export default class GameScene extends Phaser.Scene {
   createEnergyBall(x, y, flipX) {
     // Este método ya no se usa para Colombia Ball
     // Se mantiene por compatibilidad pero no crea balas
+  }
+
+  createColombiaKnife(x, y, velX, velY, angle, chargeLevel = 0, knifeScale = 1.6) {
+    if (this.gameOver || this.gameWon) return;
+    if (!this.octopus || !this.octopus.active) return;
+
+    const isSuperCharge = chargeLevel >= 10;
+    const burnTicks = isSuperCharge ? 0 : Math.floor(2 + chargeLevel * 0.5);
+
+    const knife = this.physics.add.image(x, y, 'colombiaKnife');
+    knife.setAngle(angle);
+    knife.body.allowGravity = false;
+    knife.setVelocity(velX, velY);
+    knife.setScale(knifeScale);
+    if (isSuperCharge) knife.setTint(0xFFFFFF);
+
+    const emberColor = isSuperCharge ? 0xFFFF00 : 0xFF4400;
+    this.time.addEvent({
+      delay: 25,
+      callback: () => {
+        if (!knife.active) return;
+        const ember = this.add.circle(knife.x, knife.y, Phaser.Math.Between(isSuperCharge ? 8 : 4, isSuperCharge ? 16 : 9), emberColor, 0.8);
+        this.tweens.add({ targets: ember, scale: 0, alpha: 0, duration: 220, onComplete: () => ember.destroy() });
+      },
+      loop: true, repeat: 40
+    });
+
+    this.physics.add.overlap(knife, this.octopus, () => {
+      if (!this.octopus.active || !knife.active) return;
+      const bx = this.octopus.x, by = this.octopus.y;
+      knife.destroy();
+      this.soundGen.play('hit');
+
+      if (isSuperCharge) {
+        this.cameras.main.shake(300, 0.018);
+        const boom = this.add.circle(bx, by, 10, 0xFFFF00, 1);
+        this.tweens.add({ targets: boom, scale: 14, alpha: 0, duration: 600, onComplete: () => boom.destroy() });
+        const fire = this.add.circle(bx, by, 5, 0xFF4400, 0.9);
+        this.tweens.add({ targets: fire, scale: 12, alpha: 0, duration: 800, onComplete: () => fire.destroy() });
+        for (let i = 0; i < 12; i++) {
+          const spark = this.add.circle(bx + Phaser.Math.Between(-80,80), by + Phaser.Math.Between(-80,80), Phaser.Math.Between(6,16), 0xFF6600, 0.9);
+          this.tweens.add({ targets: spark, scale: 0, alpha: 0, duration: Phaser.Math.Between(400,700), onComplete: () => spark.destroy() });
+        }
+        for (let i = 0; i < 15; i++) {
+          if (this.octopus.active) this.octopus.takeDamage();
+        }
+      } else {
+        this.octopus.takeDamage();
+        const burn = this.add.circle(bx, by, 25, 0xFF4400, 0.85);
+        this.tweens.add({ targets: burn, scale: 2.5, alpha: 0, duration: 350, onComplete: () => burn.destroy() });
+        for (let i = 1; i <= burnTicks; i++) {
+          this.time.delayedCall(i * 500, () => {
+            if (this.octopus && this.octopus.active) {
+              this.octopus.takeDamage();
+              const dot = this.add.circle(this.octopus.x, this.octopus.y, 12, 0xFF6600, 0.7);
+              this.tweens.add({ targets: dot, scale: 2, alpha: 0, duration: 250, onComplete: () => dot.destroy() });
+            }
+          });
+        }
+      }
+    });
+
+    this.time.delayedCall(2000, () => { if (knife.active) knife.destroy(); });
   }
 
   // Crear torbellino de Clon
@@ -1553,6 +1712,43 @@ export default class GameScene extends Phaser.Scene {
     }
   }
 
+  // Mega bola de fuego cargada (doble tamaño, triple daño)
+  createMegaFireball(x, y, flipX) {
+    if (!this.octopus || !this.octopus.active) return;
+
+    const bullet = this.bullets.get(x, y, 'bigFireball');
+    if (!bullet) return;
+
+    bullet.setActive(true);
+    bullet.setVisible(true);
+    bullet.body.reset(x, y);
+
+    const direction = flipX ? -1 : 1;
+    bullet.setVelocityX(680 * direction);
+    bullet.body.allowGravity = false;
+    bullet.damage = 24;
+    bullet.bulletType = 'bigFireball';
+    bullet.setScale(2.2);
+    bullet.setTint(0xFFFFAA);
+
+    // Pulso de escala épico
+    this.tweens.add({ targets: bullet, scale: 2.7, duration: 100, yoyo: true, repeat: -1 });
+
+    // Trail de fuego denso
+    const trail = this.time.addEvent({
+      delay: 25,
+      callback: () => {
+        if (!bullet.active) { trail.remove(); return; }
+        const colors = [0xFF2200, 0xFF6600, 0xFFFF00, 0xFF4400];
+        const p = this.add.circle(bullet.x, bullet.y, Phaser.Math.Between(8, 18), Phaser.Math.RND.pick(colors), 0.8);
+        this.tweens.add({ targets: p, scale: 0, alpha: 0, duration: 250, onComplete: () => p.destroy() });
+      },
+      loop: true
+    });
+
+    this.time.delayedCall(3500, () => { if (bullet.active) { bullet.setActive(false); bullet.setVisible(false); } });
+  }
+
   update() {
     if (!this.gameOver && !this.gameWon) {
       // Usar controles táctiles o de teclado según el dispositivo
@@ -1589,6 +1785,8 @@ export default class GameScene extends Phaser.Scene {
       this.updateTeleportBullets();
       // Actualizar bolas magnéticas de Perrito
       this.updateMagnetBalls();
+      // Homing suave de balas normales del jugador
+      this.updatePlayerHomingBullets();
     }
   }
 

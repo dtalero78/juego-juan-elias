@@ -7,24 +7,20 @@ export default class Dolphin extends Phaser.Physics.Arcade.Sprite {
     scene.add.existing(this);
     scene.physics.add.existing(this);
 
-    // Hacer el delfín más pequeño
     this.setScale(0.5);
 
-    // Reducir hitbox - ajustado para mejor colisión con el suelo
     this.body.setSize(this.width * 0.6, this.height * 0.8);
     this.body.setOffset(this.width * 0.2, this.height * 0.1);
 
     this.setCollideWorldBounds(true);
     this.body.setCollideWorldBounds(true);
-    this.speed = 220;
-    this.jumpForce = -500; // Aumentado para alcanzar plataformas
+    this.speed = 230;
+    this.jumpForce = -510;
     this.canShoot = true;
-    this.shootCooldown = 250; // ms entre disparos
+    this.shootCooldown = 220;
 
-    // Modo PvP
     this.isPvPMode = isPvPMode;
 
-    // Vida según modo
     if (isPvPMode) {
       this.health = 100;
       this.maxHealth = 100;
@@ -36,61 +32,60 @@ export default class Dolphin extends Phaser.Physics.Arcade.Sprite {
     this.invulnerable = false;
     this.invulnerabilityTime = 1000;
 
-    // Guardar tipos de bala seleccionados
     this.selectedBullets = selectedBullets;
-
-    // Sistema de tipos de bala con munición limitada (solo los seleccionados)
     this.bulletType = selectedBullets[0];
     this.ammo = {};
 
-    // Inicializar munición solo para los tipos seleccionados
     const initialAmmo = {
-      normal: 20,
-      fire: 15,
-      ice: 15,
-      triple: 10,
-      fast: 15,
+      normal:   25,
+      fire:     18,
+      ice:      6,
+      triple:   10,
+      fast:     18,
       teleport: 5,
-      xmas: 8
+      xmas:     8
     };
 
     selectedBullets.forEach(type => {
       this.ammo[type] = initialAmmo[type] || 15;
     });
 
-    // En modo PvP, iniciar con 50 balas
     if (isPvPMode) {
       this.ammo[this.bulletType] = 50;
     }
 
-    // Control de animación de ataque
     this.isAttacking = false;
-    this.attackDuration = 200; // ms que dura la animación de ataque
+    this.attackDuration = 180;
 
-    // Control de salto - usar flag manual en lugar de detectar colisión
     this.isInAir = false;
+    this.currentSpriteState = 'idle';
 
-    // Estado actual del sprite para evitar parpadeo
-    this.currentSpriteState = 'idle'; // 'idle', 'jump', 'attack'
-
-    // Cooldowns especiales por tipo de bala
     this.specialCooldowns = {
-      ice: { cooldown: 10000, canShoot: true } // 10 segundos para hielo
+      ice: { cooldown: 8000, canShoot: true }
     };
 
-    // Dash - mejorado: más rápido, más lejos, direccional
+    // Dash
     this.canDash = true;
     this.isDashing = false;
-    this.dashSpeed = 900; // Más rápido (era 600)
-    this.dashDuration = 200; // Más duración = más lejos (era 150)
-    this.dashCooldown = 600; // Cooldown más corto (era 800)
+    this.dashSpeed = 950;
+    this.dashDuration = 190;
+    this.dashCooldown = 580;
+
+    // Doble salto
+    this.jumpsLeft = 2;
+    this.wasUpDown = false;
+
+    // Modo Frenesí
+    this.recentShotTimes = [];
+    this.frenzyActive = false;
+    this.frenzyAura = null;
+    this.normalCooldown = 220;
+    this.frenzyMultiplier = 1;
   }
 
   update(cursors, wasd, spaceBar, xKey) {
-    // Si está en dash, no permitir control normal
     if (this.isDashing) return;
 
-    // Movimiento horizontal
     if (cursors.left.isDown || wasd.a.isDown) {
       this.setVelocityX(-this.speed);
       this.setFlipX(true);
@@ -101,232 +96,294 @@ export default class Dolphin extends Phaser.Physics.Arcade.Sprite {
       this.setVelocityX(0);
     }
 
-    // Detectar si está en el suelo
     const onGround = this.body.blocked.down || this.body.touching.down;
-
-    // Saltar (solo si está en el suelo)
-    if ((cursors.up.isDown || wasd.w.isDown) && onGround) {
-      this.setVelocityY(this.jumpForce);
-      this.isInAir = true; // Marcamos que saltó
-      this.scene.events.emit('dolphinJump');
+    if (onGround) {
+      this.jumpsLeft = 2;
+      if (Math.abs(this.body.velocity.y) < 20) this.isInAir = false;
     }
 
-    // Dash con X - direccional según WASD
-    if (xKey && xKey.isDown && this.canDash) {
-      // Determinar dirección del dash
-      let dashDirX = 0;
-      let dashDirY = 0;
+    // Doble salto (JustDown manual)
+    const upPressed = cursors.up.isDown || wasd.w.isDown;
+    if (upPressed && !this.wasUpDown) {
+      if (onGround) {
+        this.setVelocityY(this.jumpForce);
+        this.jumpsLeft = 1;
+        this.isInAir = true;
+        this.scene.events.emit('dolphinJump');
+      } else if (this.jumpsLeft > 0) {
+        this.setVelocityY(this.jumpForce * 0.85);
+        this.jumpsLeft--;
+        this.scene.events.emit('dolphinJump');
+        // Explosión acuática en los pies
+        this._aquaBurst(this.x, this.y + 20);
+      }
+    }
+    this.wasUpDown = upPressed;
 
+    // Dash direccional con X
+    if (xKey && xKey.isDown && this.canDash) {
+      let dashDirX = 0, dashDirY = 0;
       if (wasd.w.isDown || cursors.up.isDown) dashDirY = -1;
       if (wasd.s.isDown || cursors.down.isDown) dashDirY = 1;
       if (wasd.a.isDown || cursors.left.isDown) dashDirX = -1;
       if (wasd.d.isDown || cursors.right.isDown) dashDirX = 1;
-
-      // Si no hay dirección, usar la dirección donde mira
-      if (dashDirX === 0 && dashDirY === 0) {
-        dashDirX = this.flipX ? -1 : 1;
-      }
-
+      if (dashDirX === 0 && dashDirY === 0) dashDirX = this.flipX ? -1 : 1;
       this.performDash(dashDirX, dashDirY);
     }
 
-    // Si aterrizó (velocidad Y es casi 0 y está tocando suelo)
-    if (onGround && Math.abs(this.body.velocity.y) < 20) {
-      this.isInAir = false;
-    }
-
-    // Determinar sprite basado en isInAir (controlado manualmente, no parpadea)
+    // Estado del sprite
     let newState;
+    if (this.isAttacking) newState = 'attack';
+    else if (this.isInAir) newState = 'jump';
+    else newState = 'idle';
 
-    if (this.isAttacking) {
-      newState = 'attack';
-    } else if (this.isInAir) {
-      newState = 'jump';
-    } else {
-      newState = 'idle';
-    }
-
-    // Solo cambiar textura si el estado realmente cambió
     if (newState !== this.currentSpriteState) {
       this.currentSpriteState = newState;
-      if (newState === 'attack') {
-        this.setTexture('dolphin_attack');
-      } else if (newState === 'jump') {
-        this.setTexture('dolphin_jump');
-      } else {
-        this.setTexture('dolphin');
-      }
+      if (newState === 'attack') this.setTexture('dolphin_attack');
+      else if (newState === 'jump') this.setTexture('dolphin_jump');
+      else this.setTexture('dolphin');
     }
 
-    // Disparar
     if (spaceBar.isDown && this.canShoot && this.getTotalAmmo() > 0) {
       this.shoot();
     }
+
+    this._updateFrenzyAura();
   }
 
   shoot() {
-    // Verificar que tiene munición del tipo actual
     if (this.ammo[this.bulletType] <= 0) {
-      // Cambiar a un tipo que tenga munición
       this.switchToAvailableAmmo();
       if (this.getTotalAmmo() <= 0) return;
     }
 
-    // Verificar cooldown especial para balas de hielo
     if (this.bulletType === 'ice' && this.specialCooldowns.ice && !this.specialCooldowns.ice.canShoot) {
-      return; // No puede disparar hielo todavía
+      return;
     }
 
     this.canShoot = false;
     this.isAttacking = true;
 
-    // Consumir munición
     this.ammo[this.bulletType]--;
 
-    // Emitir evento de disparo con el tipo de bala
-    this.scene.events.emit('dolphinShoot', this.x + 20, this.y, this.bulletType, this.flipX, this);
-
-    // Terminar animación de ataque
-    this.scene.time.delayedCall(this.attackDuration, () => {
-      this.isAttacking = false;
-    });
-
-    // Cooldown especial para balas de hielo (10 segundos)
-    if (this.bulletType === 'ice') {
-      this.specialCooldowns.ice.canShoot = false;
-      this.scene.time.delayedCall(10000, () => {
-        this.specialCooldowns.ice.canShoot = true;
-      });
+    // Rastrear disparos para frenesí
+    const now = this.scene.time.now;
+    this.recentShotTimes = this.recentShotTimes.filter(t => now - t < 3000);
+    this.recentShotTimes.push(now);
+    if (this.recentShotTimes.length >= 5 && !this.frenzyActive) {
+      this._activateFrenzy();
     }
 
-    this.scene.time.delayedCall(this.shootCooldown, () => {
-      this.canShoot = true;
-    });
+    // Flash de disparo según tipo
+    this._muzzleFlash(this.bulletType);
+
+    // En frenesí: emit con multiplicador
+    this.scene.events.emit('dolphinShoot', this.x + 20, this.y, this.bulletType, this.flipX, this, this.frenzyMultiplier);
+
+    this.scene.time.delayedCall(this.attackDuration, () => { this.isAttacking = false; });
+
+    if (this.bulletType === 'ice') {
+      this.specialCooldowns.ice.canShoot = false;
+      this.scene.time.delayedCall(8000, () => { this.specialCooldowns.ice.canShoot = true; });
+    }
+
+    const cd = this.frenzyActive ? 130 : this.normalCooldown;
+    this.scene.time.delayedCall(cd, () => { this.canShoot = true; });
   }
 
-  // Obtener total de munición
   getTotalAmmo() {
     return Object.values(this.ammo).reduce((a, b) => a + b, 0);
   }
 
-  // Cambiar a munición disponible (solo entre los seleccionados)
   switchToAvailableAmmo() {
     for (const type of this.selectedBullets) {
-      if (this.ammo[type] > 0) {
-        this.bulletType = type;
-        return;
-      }
+      if (this.ammo[type] > 0) { this.bulletType = type; return; }
     }
   }
 
-  // Añadir munición
   addAmmo(type, amount) {
-    if (this.ammo.hasOwnProperty(type)) {
-      this.ammo[type] += amount;
-    }
+    if (this.ammo.hasOwnProperty(type)) this.ammo[type] += amount;
   }
 
-  // Recargar munición automáticamente (para modo PvP)
   reloadAmmo(amount = 50) {
-    // Recargar el tipo de bala actual
-    if (this.ammo.hasOwnProperty(this.bulletType)) {
-      this.ammo[this.bulletType] += amount;
-    }
+    if (this.ammo.hasOwnProperty(this.bulletType)) this.ammo[this.bulletType] += amount;
   }
 
-  // Cambiar tipo de bala (se puede llamar con powerups)
   changeBulletType(type) {
-    if (this.ammo.hasOwnProperty(type) && this.ammo[type] > 0) {
-      this.bulletType = type;
-    }
+    if (this.ammo.hasOwnProperty(type) && this.ammo[type] > 0) this.bulletType = type;
   }
 
-  // Ciclar entre tipos de bala disponibles (solo los seleccionados)
   nextBulletType() {
     const currentIndex = this.selectedBullets.indexOf(this.bulletType);
     for (let i = 1; i <= this.selectedBullets.length; i++) {
       const nextIndex = (currentIndex + i) % this.selectedBullets.length;
       const nextType = this.selectedBullets[nextIndex];
-      if (this.ammo[nextType] > 0) {
-        this.bulletType = nextType;
-        return this.bulletType;
-      }
+      if (this.ammo[nextType] > 0) { this.bulletType = nextType; return this.bulletType; }
     }
     return this.bulletType;
   }
 
-  // Realizar dash - direccional (X+W=arriba, X+S=abajo, X+A=izq, X+D=der)
+  // ── DASH ÉPICO ─────────────────────────────────────────────────────────────
   performDash(dirX = 1, dirY = 0) {
     this.canDash = false;
     this.isDashing = true;
+    this.invulnerable = true;
 
-    // Normalizar dirección si es diagonal
     const magnitude = Math.sqrt(dirX * dirX + dirY * dirY);
     const normX = dirX / magnitude;
     const normY = dirY / magnitude;
 
-    // Aplicar velocidad de dash en la dirección indicada
     this.setVelocityX(this.dashSpeed * normX);
     this.setVelocityY(this.dashSpeed * normY);
 
-    // Voltear sprite según dirección horizontal
-    if (dirX !== 0) {
-      this.setFlipX(dirX < 0);
-    }
+    if (dirX !== 0) this.setFlipX(dirX < 0);
+    if (dirY !== 0) this.isInAir = true;
 
-    // Si hay dash vertical, marcar como en el aire
-    if (dirY !== 0) {
-      this.isInAir = true;
-    }
-
-    // Efecto visual mejorado
-    this.setTint(0x00FFFF);
-    this.alpha = 0.6;
-
-    // Crear efecto de estela
-    this.createDashTrail();
-
-    // Emitir evento de sonido
-    this.scene.events.emit('dolphinDash');
-
-    // Terminar dash después de la duración
-    this.scene.time.delayedCall(this.dashDuration, () => {
-      this.isDashing = false;
-      this.clearTint();
-      this.alpha = 1;
-      // Solo detener velocidad horizontal si no estaba en dirección vertical
-      if (dirY === 0) {
-        this.setVelocityX(0);
-      }
-    });
-
-    // Cooldown del dash
-    this.scene.time.delayedCall(this.dashCooldown, () => {
-      this.canDash = true;
-    });
-  }
-
-  // Crear efecto de estela durante el dash
-  createDashTrail() {
-    // Crear 3 copias fantasma que desaparecen
-    for (let i = 0; i < 3; i++) {
-      this.scene.time.delayedCall(i * 40, () => {
+    // 7 afterimages en degradé cian→azul
+    const dashColors = [0x00FFFF, 0x00E5FF, 0x00BFFF, 0x1E90FF, 0x00FFFF, 0x40E0D0, 0x00CED1];
+    for (let i = 0; i < 7; i++) {
+      this.scene.time.delayedCall(i * 22, () => {
         if (!this.scene) return;
         const ghost = this.scene.add.sprite(this.x, this.y, this.texture.key);
         ghost.setScale(this.scaleX, this.scaleY);
         ghost.setFlipX(this.flipX);
-        ghost.setTint(0x00FFFF);
-        ghost.setAlpha(0.5 - i * 0.15);
+        ghost.setTint(dashColors[i]);
+        ghost.setAlpha(0.6 - i * 0.07);
+        this.scene.tweens.add({ targets: ghost, alpha: 0, duration: 180 + i * 10, onComplete: () => ghost.destroy() });
+      });
+    }
 
-        this.scene.tweens.add({
-          targets: ghost,
-          alpha: 0,
-          duration: 150,
-          onComplete: () => ghost.destroy()
-        });
+    // Burbujas de agua durante el dash
+    for (let i = 0; i < 6; i++) {
+      this.scene.time.delayedCall(i * 25, () => {
+        if (!this.active) return;
+        const bub = this.scene.add.circle(
+          this.x + Phaser.Math.Between(-12, 12),
+          this.y + Phaser.Math.Between(-12, 12),
+          Phaser.Math.Between(3, 7), 0x00FFFF, 0.8
+        );
+        this.scene.tweens.add({ targets: bub, alpha: 0, scaleX: 2.5, scaleY: 0.5, duration: 230, onComplete: () => bub.destroy() });
+      });
+    }
+
+    this.setTint(0x00FFFF);
+    this.alpha = 0.7;
+
+    // Dash dispara 2 balas automáticamente en la dirección del movimiento
+    this.scene.time.delayedCall(30, () => {
+      if (!this.active) return;
+      this.scene.events.emit('dolphinShoot', this.x, this.y, this.bulletType, normX < 0, this, this.frenzyMultiplier);
+    });
+    this.scene.time.delayedCall(110, () => {
+      if (!this.active) return;
+      this.scene.events.emit('dolphinShoot', this.x, this.y, this.bulletType, normX < 0, this, this.frenzyMultiplier);
+    });
+
+    this.scene.events.emit('dolphinDash');
+
+    this.scene.time.delayedCall(this.dashDuration, () => {
+      this.isDashing = false;
+      this.clearTint();
+      this.alpha = 1;
+      if (dirY === 0) this.setVelocityX(0);
+
+      // Explosión acuática al final
+      this._aquaBurst(this.x, this.y);
+
+      // Boost de velocidad breve
+      this.speed = 330;
+      this.scene.time.delayedCall(650, () => { if (this.active) this.speed = 230; });
+    });
+
+    this.scene.time.delayedCall(this.dashCooldown, () => {
+      this.canDash = true;
+      if (!this.isDashing) this.invulnerable = false;
+    });
+  }
+
+  // ── MODO FRENESÍ ───────────────────────────────────────────────────────────
+  _activateFrenzy() {
+    this.frenzyActive = true;
+    this.frenzyMultiplier = 1.5;
+    this.recentShotTimes = [];
+
+    // Aura cian pulsante orbitando alrededor del jugador
+    this.frenzyAura = this.scene.add.graphics();
+    this.frenzyAura.lineStyle(3, 0x00FFFF, 0.9);
+    this.frenzyAura.strokeCircle(0, 0, 28);
+    this.scene.tweens.add({
+      targets: this.frenzyAura,
+      alpha: 0.3, scaleX: 1.4, scaleY: 1.4,
+      duration: 220, yoyo: true, repeat: -1
+    });
+
+    // Anuncio "¡FRENESÍ!"
+    this.scene.events.emit('dolphinFrenzy', true);
+
+    // Chispas de activación
+    for (let i = 0; i < 12; i++) {
+      const angle = (i / 12) * Math.PI * 2;
+      const sp = this.scene.add.circle(this.x + Math.cos(angle) * 22, this.y + Math.sin(angle) * 22, 5, 0x00FFFF, 1);
+      this.scene.tweens.add({
+        targets: sp,
+        x: this.x + Math.cos(angle) * 70, y: this.y + Math.sin(angle) * 70,
+        alpha: 0, duration: 400, ease: 'Cubic.easeOut', onComplete: () => sp.destroy()
+      });
+    }
+
+    // Duración del frenesí: 3.5s
+    this.scene.time.delayedCall(3500, () => {
+      this.frenzyActive = false;
+      this.frenzyMultiplier = 1;
+      if (this.frenzyAura) { this.scene.tweens.killTweensOf(this.frenzyAura); this.frenzyAura.destroy(); this.frenzyAura = null; }
+      this.scene.events.emit('dolphinFrenzy', false);
+    });
+  }
+
+  // Actualizar posición del aura en update
+  _updateFrenzyAura() {
+    if (this.frenzyAura && this.frenzyAura.active) {
+      this.frenzyAura.setPosition(this.x, this.y);
+    }
+  }
+
+  // ── HELPERS VISUALES ──────────────────────────────────────────────────────
+
+  _aquaBurst(x, y) {
+    const core = this.scene.add.circle(x, y, 10, 0x00FFFF, 0.9);
+    this.scene.tweens.add({ targets: core, scale: 3.5, alpha: 0, duration: 300, onComplete: () => core.destroy() });
+    for (let i = 0; i < 6; i++) {
+      const angle = (i / 6) * Math.PI * 2;
+      const drop = this.scene.add.circle(x + Math.cos(angle) * 10, y + Math.sin(angle) * 10, 4, 0x40E0D0, 1);
+      this.scene.tweens.add({
+        targets: drop,
+        x: x + Math.cos(angle) * 45, y: y + Math.sin(angle) * 45,
+        alpha: 0, duration: 280, ease: 'Cubic.easeOut', onComplete: () => drop.destroy()
       });
     }
   }
+
+  _muzzleFlash(bulletType) {
+    const dir = this.flipX ? -1 : 1;
+    const fx = this.x + dir * 28;
+    const fy = this.y;
+
+    const colors = {
+      normal:   0x00FFFF,
+      fire:     0xFF4500,
+      ice:      0xADD8E6,
+      triple:   0xFFFF00,
+      fast:     0xFFFF00,
+      teleport: 0xCC00FF,
+      xmas:     0xFF3333
+    };
+
+    const color = colors[bulletType] || 0xFFFFFF;
+    const flash = this.scene.add.circle(fx, fy, 9, color, 0.95);
+    this.scene.tweens.add({ targets: flash, scale: 0, alpha: 0, duration: 160, onComplete: () => flash.destroy() });
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
 
   takeDamage() {
     if (this.invulnerable) return this.health;
@@ -334,16 +391,10 @@ export default class Dolphin extends Phaser.Physics.Arcade.Sprite {
     this.health--;
     this.invulnerable = true;
 
-    // Efecto visual de parpadeo
     this.scene.tweens.add({
-      targets: this,
-      alpha: 0.3,
-      duration: 100,
-      yoyo: true,
-      repeat: 5
+      targets: this, alpha: 0.3, duration: 100, yoyo: true, repeat: 5
     });
 
-    // Quitar invulnerabilidad después de un tiempo
     this.scene.time.delayedCall(this.invulnerabilityTime, () => {
       this.invulnerable = false;
       this.alpha = 1;

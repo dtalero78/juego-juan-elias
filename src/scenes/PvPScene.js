@@ -291,11 +291,12 @@ export default class PvPScene extends Phaser.Scene {
     });
 
     this.events.on('triangleFireball', (x, y, flipX, character) => {
-      if (character === this.player || character?.isPlayer1) {
-        this.createPlayerBullet(x, y, 'bigFireball', flipX);
-      } else {
-        this.createOpponentBullet(x, y, 'bigFireball', flipX);
-      }
+      const isPlayer = (character === this.player || character?.isPlayer1);
+      this.createTriangleFireball(x, y, flipX, isPlayer);
+    });
+    this.events.on('triangleMegaFireball', (x, y, flipX, character) => {
+      const isPlayer = (character === this.player || character?.isPlayer1);
+      this.createTriangleFireball(x, y, flipX, isPlayer, true);
     });
 
     // Clon - torbellinos
@@ -321,6 +322,10 @@ export default class PvPScene extends Phaser.Scene {
     this.events.on('perritoMagnet', (x, y, flipX, character) => {
       const isPlayer = (character === this.player || character?.isPlayer1);
       this.createMagnetBall(x, y, flipX, isPlayer);
+    });
+    this.events.on('perritoMelee', (hitX, hitY, perrito) => {
+      const isPlayer = (perrito === this.player);
+      this.handlePerritoMelee(hitX, hitY, perrito, isPlayer);
     });
     this.events.on('colombiaJump', () => this.soundGen.play('jump'));
     this.events.on('colombiaDash', () => this.soundGen.play('dash'));
@@ -466,6 +471,52 @@ export default class PvPScene extends Phaser.Scene {
     }
   }
 
+  createTriangleFireball(x, y, flipX, isPlayer, isMega = false) {
+    if (this.gameOver) return;
+    const dir = flipX ? -1 : 1;
+    const fb = this.physics.add.image(x + dir * 20, y, 'bigFireball');
+    fb.body.allowGravity = false;
+    fb.setVelocityX(dir * (isMega ? 700 : 450));
+    fb.setScale(isMega ? 2.2 : 1.3);
+    if (isMega) {
+      fb.setTint(0xFFFFAA);
+      this.tweens.add({ targets: fb, scale: 2.7, duration: 90, yoyo: true, repeat: -1 });
+      const trail = this.time.addEvent({ delay: 25, callback: () => { if (!fb.active) { trail.remove(); return; } const p = this.add.circle(fb.x, fb.y, Phaser.Math.Between(6,14), Phaser.Math.RND.pick([0xFF2200,0xFF6600,0xFFFF00]), 0.8); this.tweens.add({ targets: p, scale: 0, alpha: 0, duration: 220, onComplete: () => p.destroy() }); }, loop: true });
+    }
+
+    const target = isPlayer ? this.opponent : this.player;
+    const updateHealth = isPlayer
+      ? () => this.updateOpponentHealth()
+      : () => this.updatePlayerHealth();
+
+    this.physics.add.overlap(fb, target, () => {
+      if (!fb.active || this.gameOver) return;
+      // Comprobar escudo del objetivo
+      const block = target.canBlockProjectile ? target.canBlockProjectile(fb.x, fb.y) : { canBlock: false };
+      if (block.canBlock) {
+        target.blockAttack(block.cardIndex);
+        fb.destroy();
+        this.soundGen.play('pickup');
+        return;
+      }
+      fb.destroy();
+      for (let i = 0; i < (isMega ? 10 : 3); i++) target.takeDamage();
+      this.soundGen.play('explosion');
+      updateHealth();
+      if (target.health <= 0) this.handleVictory(isPlayer);
+    });
+
+    // Destruir si sale de pantalla
+    this.time.addEvent({
+      delay: 100,
+      callback: () => {
+        if (fb.active && (fb.x < -80 || fb.x > 880)) fb.destroy();
+      },
+      loop: true,
+      repeat: 30
+    });
+  }
+
   createPlayerTorbellino(x, y, flipX) {
     const torb = this.playerTorbellinos.get(x, y);
     if (torb) {
@@ -511,6 +562,18 @@ export default class PvPScene extends Phaser.Scene {
   hitPlayer(player, bullet) {
     if (!bullet.active || this.gameOver) return;
 
+    // Comprobar escudo del triángulo
+    if (player.canBlockProjectile) {
+      const block = player.canBlockProjectile(bullet.x, bullet.y);
+      if (block.canBlock) {
+        player.blockAttack(block.cardIndex);
+        bullet.setActive(false);
+        bullet.setVisible(false);
+        this.soundGen.play('pickup');
+        return;
+      }
+    }
+
     bullet.setActive(false);
     bullet.setVisible(false);
 
@@ -525,6 +588,18 @@ export default class PvPScene extends Phaser.Scene {
 
   hitOpponent(opponent, bullet) {
     if (!bullet.active || this.gameOver) return;
+
+    // Comprobar escudo del triángulo
+    if (opponent.canBlockProjectile) {
+      const block = opponent.canBlockProjectile(bullet.x, bullet.y);
+      if (block.canBlock) {
+        opponent.blockAttack(block.cardIndex);
+        bullet.setActive(false);
+        bullet.setVisible(false);
+        this.soundGen.play('pickup');
+        return;
+      }
+    }
 
     bullet.setActive(false);
     bullet.setVisible(false);
@@ -734,8 +809,8 @@ export default class PvPScene extends Phaser.Scene {
       const target = isPlayer ? this.opponent : this.player;
       if (target && target.active) {
         const dist = Phaser.Math.Distance.Between(magnet.x, magnet.y, target.x, target.y);
-        if (dist < 140) {
-          target.takeDamage(15);
+        if (dist < 100) {
+          target.takeDamage(8);
           if (isPlayer) this.updateOpponentHealth(); else this.updatePlayerHealth();
         }
       }
@@ -774,6 +849,22 @@ export default class PvPScene extends Phaser.Scene {
     this.soundGen.play('pickup');
   }
 
+  handlePerritoMelee(hitX, hitY, perrito, isPlayer) {
+    if (this.gameOver) return;
+    this.soundGen.play('hit');
+
+    const target = isPlayer ? this.opponent : this.player;
+    if (target && target.active) {
+      const dist = Phaser.Math.Distance.Between(hitX, hitY, target.x, target.y);
+      if (dist < 90) {
+        target.takeDamage(10);
+        if (isPlayer) this.updateOpponentHealth(); else this.updatePlayerHealth();
+        const impact = this.add.circle(target.x, target.y, 25, perrito.magnetColor, 0.7);
+        this.tweens.add({ targets: impact, alpha: 0, scale: 2, duration: 300, onComplete: () => impact.destroy() });
+      }
+    }
+  }
+
   updateMagnetBalls() {
     const attractBullets = (magnets, bulletGroup) => {
       magnets.forEach(m => {
@@ -783,8 +874,8 @@ export default class PvPScene extends Phaser.Scene {
         bulletGroup.getChildren().forEach(bullet => {
           if (!bullet.active) return;
           const dist = Phaser.Math.Distance.Between(bullet.x, bullet.y, m.sprite.x, m.sprite.y);
-          if (dist < 160) {
-            if (dist < 22) {
+          if (dist < 120) {
+            if (dist < 16) {
               bullet.setActive(false);
               bullet.setVisible(false);
               if (bullet.body) bullet.body.stop();
@@ -883,6 +974,7 @@ export default class PvPScene extends Phaser.Scene {
     this.events.off('triangleDash');
     this.events.off('triangleShoot');
     this.events.off('triangleFireball');
+    this.events.off('triangleMegaFireball');
   }
 
   showReloadText(x, y, characterName) {

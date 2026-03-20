@@ -175,21 +175,21 @@ export default class MenuScene extends Phaser.Scene {
       fontSize: this.isMobileDevice ? '11px' : '13px', fill: '#FF4444', fontFamily: 'Courier New'
     }).setOrigin(0.5);
 
-    this.bossIceBtn = this.add.rectangle(205, bossY, 120, 26, 0x003355);
+    this.bossIceBtn = this.add.rectangle(175, bossY, 110, 26, 0x003355);
     this.bossIceBtn.setStrokeStyle(2, 0x00BFFF).setInteractive({ useHandCursor: true });
-    this.add.text(205, bossY, '❄ Jefe Hielo', {
+    this.add.text(175, bossY, '❄ Jefe Hielo', {
       fontSize: '11px', fill: '#00BFFF', fontFamily: 'Courier New', fontStyle: 'bold'
     }).setOrigin(0.5);
 
-    this.bossFinalBtn = this.add.rectangle(400, bossY, 120, 26, 0x330000);
+    this.bossFinalBtn = this.add.rectangle(400, bossY, 110, 26, 0x330000);
     this.bossFinalBtn.setStrokeStyle(2, 0x444444).setInteractive({ useHandCursor: true });
     this.add.text(400, bossY, '💀 Hector', {
       fontSize: '11px', fill: '#FF4444', fontFamily: 'Courier New', fontStyle: 'bold'
     }).setOrigin(0.5);
 
-    this.bossBlibluBtn = this.add.rectangle(595, bossY, 120, 26, 0x3a2200);
+    this.bossBlibluBtn = this.add.rectangle(625, bossY, 110, 26, 0x3a2200);
     this.bossBlibluBtn.setStrokeStyle(2, 0xFF8800).setInteractive({ useHandCursor: true });
-    this.add.text(595, bossY, '🔴 Brutus', {
+    this.add.text(625, bossY, '🔴 Brutus', {
       fontSize: '11px', fill: '#FF8800', fontFamily: 'Courier New', fontStyle: 'bold'
     }).setOrigin(0.5);
 
@@ -347,13 +347,13 @@ export default class MenuScene extends Phaser.Scene {
       this.pvpButton.setFillStyle(0x663399);
     });
 
-    // Botón TIENDA
+    // Botón TIENDA (fila 2, izquierda — debajo de VS BOSS)
     const shopBtnY = this.isMobileDevice ? playBtnY + 48 : playBtnY + 58;
-    this.shopButton = this.add.rectangle(400, shopBtnY, sideBtnWidth, sideBtnHeight, 0x664400);
+    this.shopButton = this.add.rectangle(300, shopBtnY, sideBtnWidth, sideBtnHeight, 0x664400);
     this.shopButton.setStrokeStyle(2, 0xFFAA00);
     this.shopButton.setInteractive({ useHandCursor: true });
 
-    this.shopButtonText = this.add.text(400, shopBtnY, 'TIENDA', {
+    this.shopButtonText = this.add.text(300, shopBtnY, 'TIENDA', {
       fontSize: this.isMobileDevice ? '18px' : '22px',
       fill: '#FFD700',
       fontFamily: 'Courier New',
@@ -364,6 +364,21 @@ export default class MenuScene extends Phaser.Scene {
     this.shopButton.on('pointerdown', () => this.openShop());
     this.shopButton.on('pointerover', () => this.shopButton.setFillStyle(0x997700));
     this.shopButton.on('pointerout', () => this.shopButton.setFillStyle(0x664400));
+
+    // Botón PARKOUR (fila 2, derecha — debajo de PvP)
+    this.parkourButton = this.add.rectangle(500, shopBtnY, sideBtnWidth, sideBtnHeight, 0x1A6B1A);
+    this.parkourButton.setStrokeStyle(2, 0x44DD44);
+    this.parkourButton.setInteractive({ useHandCursor: true });
+    this.parkourButtonText = this.add.text(500, shopBtnY, 'PARKOUR', {
+      fontSize: this.isMobileDevice ? '17px' : '21px',
+      fill: '#88FF88',
+      fontFamily: 'Courier New',
+      fontStyle: 'bold'
+    });
+    this.parkourButtonText.setOrigin(0.5);
+    this.parkourButton.on('pointerdown', () => this.startParkour());
+    this.parkourButton.on('pointerover', () => this.parkourButton.setFillStyle(0x2A9B2A));
+    this.parkourButton.on('pointerout', () => this.parkourButton.setFillStyle(0x1A6B1A));
 
     // Instrucciones de controles
     if (!this.isMobileDevice) {
@@ -505,8 +520,8 @@ export default class MenuScene extends Phaser.Scene {
 
   selectBoss(bossType) {
     this.selectedBoss = bossType;
-    this.bossIceBtn.setFillStyle(0x003355); this.bossIceBtn.setStrokeStyle(2, 0x444444);
-    this.bossFinalBtn.setFillStyle(0x330000); this.bossFinalBtn.setStrokeStyle(2, 0x444444);
+    this.bossIceBtn.setFillStyle(0x003355);    this.bossIceBtn.setStrokeStyle(2, 0x444444);
+    this.bossFinalBtn.setFillStyle(0x330000);  this.bossFinalBtn.setStrokeStyle(2, 0x444444);
     this.bossBlibluBtn.setFillStyle(0x3a2200); this.bossBlibluBtn.setStrokeStyle(2, 0x444444);
     if (bossType === 'iceBoss') {
       this.bossIceBtn.setFillStyle(0x004466); this.bossIceBtn.setStrokeStyle(2, 0x00EEFF);
@@ -870,6 +885,13 @@ export default class MenuScene extends Phaser.Scene {
       this.pvpPlayButton.off('pointerover');
       this.pvpPlayButton.off('pointerout');
     }
+  }
+
+  startParkour() {
+    this.scene.start('ParkourScene', {
+      selectedBullets: this.selectedBullets.length >= 2 ? this.selectedBullets : ['normal', 'fire'],
+      selectedCharacter: this.selectedCharacter
+    });
   }
 
   startPvPGame() {
