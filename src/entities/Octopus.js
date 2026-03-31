@@ -22,8 +22,12 @@ export default class Octopus extends Phaser.Physics.Arcade.Sprite {
     this.maxY = 500;
     this.direction = 1;
 
+    this.stunnedUntil = 0;
+
+    this.phase2Active = false;
+
     // Sistema de ataques variados
-    this.attackTypes = ['normal', 'spread', 'rapid', 'homing', 'bomb'];
+    this.attackTypes = ['normal', 'spread', 'rapid', 'homing', 'bomb', 'star', 'laser'];
     this.currentAttackIndex = 0;
 
     // Iniciar disparos automáticos
@@ -36,6 +40,7 @@ export default class Octopus extends Phaser.Physics.Arcade.Sprite {
   }
 
   update() {
+    if (this.scene.time.now < this.stunnedUntil) return;
     // Movimiento solo vertical (arriba y abajo)
     this.y += this.moveSpeed * this.direction * 0.016;
 
@@ -105,9 +110,44 @@ export default class Octopus extends Phaser.Physics.Arcade.Sprite {
     this.scene.events.emit('octopusShoot', this.x - 40, this.y, 'bomb');
   }
 
+  // Ataque 6: Estrella — 6 balas en 360°
+  attackStar() {
+    for (let i = 0; i < 6; i++) {
+      const angle = (i / 6) * Math.PI * 2;
+      this.scene.time.delayedCall(i * 80, () => {
+        if (this.active) this.scene.events.emit('octopusShoot', this.x, this.y, 'star', angle);
+      });
+    }
+  }
+
+  // Ataque 7: Láser — 10 balas rápidas en ráfaga
+  attackLaser() {
+    for (let i = 0; i < 10; i++) {
+      this.scene.time.delayedCall(i * 70, () => {
+        if (this.active) this.scene.events.emit('octopusShoot', this.x - 40, this.y, 'laser');
+      });
+    }
+  }
+
+  activatePhase2() {
+    if (this.phase2Active) return;
+    this.phase2Active = true;
+    // Acelerar disparos
+    if (this.shootTimer) this.shootTimer.remove();
+    this.shootInterval = 1200;
+    this.shootTimer = this.scene.time.addEvent({
+      delay: this.shootInterval,
+      callback: this.performAttack,
+      callbackScope: this,
+      loop: true
+    });
+    this.scene.events.emit('octopusPhase2');
+  }
+
   takeDamage() {
     this.health--;
-    console.log('Octopus takeDamage - salud:', this.health);
+
+    if (!this.phase2Active && this.health <= 50) this.activatePhase2();
 
     // Efecto visual de daño
     this.setTint(0xff0000);

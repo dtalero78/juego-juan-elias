@@ -58,12 +58,14 @@ export default class BlibluBoss extends Phaser.Physics.Arcade.Sprite {
         this.scheduleNextAttack();
         return;
       }
-      // Elegir ataque al azar: 60% dash, 40% jump slam
+      // Elegir ataque al azar: 50% dash, 30% jump slam, 20% ground shockwave
       const roll = Math.random();
-      if (roll < 0.6) {
+      if (roll < 0.5) {
         this.performDash();
-      } else {
+      } else if (roll < 0.8) {
         this.performJumpSlam();
+      } else {
+        this.performGroundShockwave();
       }
       this.scheduleNextAttack();
     });
@@ -175,6 +177,28 @@ export default class BlibluBoss extends Phaser.Physics.Arcade.Sprite {
           }
         });
       }
+    });
+  }
+
+  performGroundShockwave() {
+    if (!this.active || this.isDashing || this.isJumping) return;
+
+    // Cargar: rojo pulsante
+    this.setTint(0xFF0000);
+    const chargeTime = this.rageMode ? 200 : 400;
+
+    this.scene.time.delayedCall(chargeTime, () => {
+      if (!this.active) return;
+      this.clearTint();
+      // Golpear el suelo
+      this.scene.cameras.main.shake(280, 0.018);
+      // Emitir onda expansiva doble
+      this.scene.events.emit('blibluSlam', this.x, this.baseY);
+      this.scene.time.delayedCall(200, () => {
+        if (!this.active) return;
+        this.scene.events.emit('blibluSlam', this.x + 80, this.baseY);
+        this.scene.events.emit('blibluSlam', this.x - 80, this.baseY);
+      });
     });
   }
 

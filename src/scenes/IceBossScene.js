@@ -1281,12 +1281,31 @@ export default class IceBossScene extends Phaser.Scene {
   }
 
   // Manejar ataque cuerpo a cuerpo de Colombia Ball
-  handleColombiaAttack(x, y, comboCount, flipX) {
-    if (!this.iceBoss || !this.iceBoss.active) return;
+  // ── Destruir mini-enemigos cerca de un punto ──────────────────────────────
+  damageMinionsNear(x, y, range) {
+    this.miniEnemies = this.miniEnemies.filter(e => {
+      if (!e.active) return false;
+      const dist = Phaser.Math.Distance.Between(x, y, e.x, e.y);
+      if (dist < range) {
+        const fx = this.add.circle(e.x, e.y, 18, 0x00FFFF, 0.85);
+        this.tweens.add({ targets: fx, alpha: 0, scale: 2.5, duration: 250, onComplete: () => fx.destroy() });
+        e.setActive(false);
+        e.setVisible(false);
+        return false;
+      }
+      return true;
+    });
+  }
 
+  handleColombiaAttack(x, y, comboCount, flipX) {
     // Calcular posición del ataque
     const attackX = flipX ? x - 40 : x + 40;
     const attackY = y;
+
+    // Daño a mini-enemigos cercanos
+    this.damageMinionsNear(attackX, attackY, 80);
+
+    if (!this.iceBoss || !this.iceBoss.active) return;
 
     // Verificar distancia al boss
     const distance = Phaser.Math.Distance.Between(attackX, attackY, this.iceBoss.x, this.iceBoss.y);
@@ -1438,6 +1457,19 @@ export default class IceBossScene extends Phaser.Scene {
       if (!m.sprite || !m.sprite.active) return;
       if (this.time.now - m.createTime < 500) return;
 
+      // Destruir mini-enemigos en radio magnético
+      this.miniEnemies = this.miniEnemies.filter(e => {
+        if (!e.active) return false;
+        const dist = Phaser.Math.Distance.Between(e.x, e.y, m.sprite.x, m.sprite.y);
+        if (dist < 140) {
+          const fx = this.add.circle(e.x, e.y, 18, 0xFF00FF, 0.85);
+          this.tweens.add({ targets: fx, alpha: 0, scale: 2.5, duration: 250, onComplete: () => fx.destroy() });
+          e.setActive(false); e.setVisible(false);
+          return false;
+        }
+        return true;
+      });
+
       // Atraer bolas de nieve del Ice Boss
       this.snowballs.getChildren().forEach(snowball => {
         if (!snowball.active) return;
@@ -1459,6 +1491,8 @@ export default class IceBossScene extends Phaser.Scene {
   handlePerritoMelee(hitX, hitY, perrito) {
     if (this.gameOver || this.gameWon) return;
     this.soundGen.play('hit');
+
+    this.damageMinionsNear(hitX, hitY, 90);
 
     if (this.iceBoss && this.iceBoss.active) {
       const dist = Phaser.Math.Distance.Between(hitX, hitY, this.iceBoss.x, this.iceBoss.y);
@@ -1489,6 +1523,17 @@ export default class IceBossScene extends Phaser.Scene {
       if (this.healthText) this.healthText.setText(`Ice Boss: ${this.iceBoss.health}`);
       this.soundGen.play('explosion');
     });
+    // Plasma también destruye mini-enemigos
+    this.miniEnemies.forEach(e => {
+      if (!e.active) return;
+      this.physics.add.overlap(e, plasma, () => {
+        if (!e.active || !plasma.active) return;
+        const fx = this.add.circle(e.x, e.y, 18, 0x00FF88, 0.85);
+        this.tweens.add({ targets: fx, alpha: 0, scale: 2.5, duration: 250, onComplete: () => fx.destroy() });
+        e.setActive(false); e.setVisible(false);
+        const idx = this.miniEnemies.indexOf(e); if (idx !== -1) this.miniEnemies.splice(idx, 1);
+      });
+    });
     this.time.delayedCall(4000, () => { if (plasma && plasma.active) plasma.destroy(); });
     this.soundGen.play('shootFire');
   }
@@ -1496,6 +1541,9 @@ export default class IceBossScene extends Phaser.Scene {
   handleClonMelee(hitX, hitY) {
     if (this.gameOver || this.gameWon) return;
     this.soundGen.play('hit');
+
+    this.damageMinionsNear(hitX, hitY, 90);
+
     if (this.iceBoss && this.iceBoss.active) {
       const dist = Phaser.Math.Distance.Between(hitX, hitY, this.iceBoss.x, this.iceBoss.y);
       if (dist < 90) {

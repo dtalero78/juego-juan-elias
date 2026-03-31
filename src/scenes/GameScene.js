@@ -110,7 +110,7 @@ export default class GameScene extends Phaser.Scene {
     this.xKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.X);
 
     // Limpiar solo los eventos del juego para evitar acumulación al reiniciar
-    ['dolphinShoot','octopusShoot','octopusDied','dolphinJump','dolphinDash','dolphinFrenzy',
+    ['dolphinShoot','octopusShoot','octopusDied','octopusPhase2','dolphinJump','dolphinDash','dolphinFrenzy',
      'colombiaJump','colombiaDash','colombiaPunch','colombiaSpecial','colombiaAttack','colombiaEnergyBall','colombiaKnifeSlash','colombiaModeChange',
      'triangleJump','triangleDash','triangleShoot','triangleShield','triangleFireball','triangleMegaFireball',
      'clonJump','clonDash','clonShoot','clonMelee','clonModeChange',
@@ -121,6 +121,13 @@ export default class GameScene extends Phaser.Scene {
     this.events.on('dolphinShoot', this.createBullet, this);
     this.events.on('octopusShoot', this.createOctopusBullet, this);
     this.events.on('octopusDied', this.handleVictory, this);
+    this.events.on('octopusPhase2', () => {
+      const txt = this.add.text(400, 260, '⚡ FASE 2 ⚡', { fontSize: '36px', fill: '#FF4400', fontFamily: 'Courier New', fontStyle: 'bold', stroke: '#330000', strokeThickness: 5 }).setOrigin(0.5).setDepth(20);
+      this.tweens.add({ targets: txt, y: 200, alpha: 0, duration: 2000, ease: 'Cubic.easeOut', onComplete: () => txt.destroy() });
+      const flash = this.add.rectangle(400, 325, 800, 650, 0xFF2200, 0.18).setDepth(19);
+      this.tweens.add({ targets: flash, alpha: 0, duration: 500, onComplete: () => flash.destroy() });
+      this.cameras.main.shake(300, 0.015);
+    }, this);
     this.events.on('dolphinJump', () => this.soundGen.play('jump'), this);
     this.events.on('dolphinDash', () => this.soundGen.play('dash'), this);
     this.events.on('dolphinFrenzy', (active) => {
@@ -606,6 +613,20 @@ export default class GameScene extends Phaser.Scene {
             bullet.setVelocity(-300, -100); // Más velocidad horizontal y sube primero
             bullet.body.allowGravity = true;
             bullet.body.setGravityY(400); // Más gravedad para arco
+            break;
+
+          case 'star':
+            // angle es el 4º param (radians) para disparar en la dirección exacta
+            bullet.setVelocity(Math.cos(angle) * 310, Math.sin(angle) * 310);
+            bullet.setScale(0.9);
+            bullet.setTint(0xFF8800);
+            break;
+
+          case 'laser':
+            // Ráfaga láser rápida
+            bullet.setVelocityX(-520);
+            bullet.setScale(0.6);
+            bullet.setTint(0x00FFFF);
             break;
 
           default: // 'normal'

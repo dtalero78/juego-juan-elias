@@ -26,6 +26,7 @@ export default class FinalBoss extends Phaser.Physics.Arcade.Sprite {
     this.floatTime = 0;
 
     this.shootTimer = null;
+    this.barrageTimer = null;
     this.shootingPaused = false;
     this.stunnedUntil = 0;
     this.startPhase1();
@@ -37,11 +38,30 @@ export default class FinalBoss extends Phaser.Physics.Arcade.Sprite {
 
   startPhase1() {
     this.shootTimer = this.scene.time.addEvent({
-      delay: 5000,
+      delay: 4000,
       callback: () => {
         if (this.active && this.phase === 1 && !this.shootingPaused) {
           this.scene.events.emit('finalBossSpread', this.x, this.y, this.target);
         }
+      },
+      loop: true
+    });
+    // Ráfaga cada 9s: 5 disparos rápidos + sacudida de pantalla
+    this.barrageTimer = this.scene.time.addEvent({
+      delay: 9000,
+      callback: () => {
+        if (!this.active || this.phase !== 1 || this.shootingPaused) return;
+        this.setTint(0xFF0000);
+        this.setScale(1.0);
+        if (this.scene.cameras) this.scene.cameras.main.shake(220, 0.014);
+        for (let i = 0; i < 5; i++) {
+          this.scene.time.delayedCall(i * 280, () => {
+            if (this.active && !this.shootingPaused) {
+              this.scene.events.emit('finalBossSpread', this.x, this.y, this.target);
+            }
+          });
+        }
+        this.scene.time.delayedCall(350, () => { if (this.active) { this.clearTint(); this.setScale(0.75); } });
       },
       loop: true
     });
@@ -53,6 +73,7 @@ export default class FinalBoss extends Phaser.Physics.Arcade.Sprite {
     this.maxHealth = 250;
 
     if (this.shootTimer) this.shootTimer.remove();
+    if (this.barrageTimer) { this.barrageTimer.remove(); this.barrageTimer = null; }
 
     let flashes = 0;
     const flashTimer = this.scene.time.addEvent({
@@ -76,10 +97,26 @@ export default class FinalBoss extends Phaser.Physics.Arcade.Sprite {
     this.scene.time.delayedCall(1500, () => {
       if (!this.active) return;
       this.shootTimer = this.scene.time.addEvent({
-        delay: 5000,
+        delay: 4000,
         callback: () => {
           if (this.active && this.phase === 2 && !this.shootingPaused) {
             this.scene.events.emit('finalBossRay', this.x, this.y, this.target);
+          }
+        },
+        loop: true
+      });
+      // Triple ray burst cada 8s
+      this.barrageTimer = this.scene.time.addEvent({
+        delay: 8000,
+        callback: () => {
+          if (!this.active || this.phase !== 2 || this.shootingPaused) return;
+          if (this.scene.cameras) this.scene.cameras.main.shake(250, 0.016);
+          for (let i = 0; i < 3; i++) {
+            this.scene.time.delayedCall(i * 380, () => {
+              if (this.active && !this.shootingPaused) {
+                this.scene.events.emit('finalBossRay', this.x, this.y, this.target);
+              }
+            });
           }
         },
         loop: true
@@ -124,6 +161,7 @@ export default class FinalBoss extends Phaser.Physics.Arcade.Sprite {
         this.transitionToPhase2();
       } else {
         if (this.shootTimer) this.shootTimer.remove();
+        if (this.barrageTimer) this.barrageTimer.remove();
         this.scene.events.emit('finalBossDied');
         this.setActive(false);
         this.setVisible(false);

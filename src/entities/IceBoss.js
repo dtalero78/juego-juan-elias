@@ -95,21 +95,61 @@ export default class IceBoss extends Phaser.Physics.Arcade.Sprite {
     if (!this.active || !this.target || !this.target.active) return;
     if (this.isDashing) return;
 
+    const roll = Math.random();
+    if (this.phase === 2 && roll < 0.25) {
+      this.iceWall();
+    } else if (roll < 0.3) {
+      this.blizzardRing();
+    } else {
+      this._normalShot();
+    }
+  }
+
+  _normalShot() {
+    if (!this.active || !this.target || !this.target.active) return;
     const angle = Phaser.Math.Angle.Between(this.x, this.y, this.target.x, this.target.y);
-
     this.scene.events.emit('iceBossShoot', this.x - 30, this.y, angle);
-
-    // Fase 2: dispara una segunda bola con ángulo ligeramente diferente
     if (this.phase === 2) {
       this.scene.events.emit('iceBossShoot', this.x - 30, this.y, angle + 0.25);
       this.scene.events.emit('iceBossShoot', this.x - 30, this.y, angle - 0.25);
     }
-
-    // Efecto visual de disparo
     this.setTint(0x00BFFF);
-    this.scene.time.delayedCall(100, () => {
-      if (this.active) this.clearTint();
+    this.scene.time.delayedCall(100, () => { if (this.active) this.clearTint(); });
+  }
+
+  blizzardRing() {
+    if (!this.active) return;
+    // Anticipación: escalar y blanquear
+    this.setTint(0xFFFFFF);
+    this.setScale(1.7);
+    this.scene.time.delayedCall(350, () => {
+      if (!this.active) return;
+      this.clearTint();
+      this.setScale(1.3);
+      // 8 bolas en todas las direcciones
+      for (let i = 0; i < 8; i++) {
+        const angle = (i / 8) * Math.PI * 2;
+        this.scene.events.emit('iceBossShoot', this.x, this.y, angle);
+      }
+      if (this.scene.cameras) this.scene.cameras.main.shake(200, 0.012);
     });
+  }
+
+  iceWall() {
+    if (!this.active) return;
+    // 5 bolas de nieve horizontales en distintas alturas
+    const dir = this.x > 400 ? -1 : 1;
+    const startX = dir > 0 ? -10 : 810;
+    const heights = [120, 225, 325, 430, 530];
+    this.setTint(0x0088FF);
+    heights.forEach((h, i) => {
+      this.scene.time.delayedCall(i * 130, () => {
+        if (!this.active) return;
+        const angle = dir > 0 ? 0 : Math.PI;
+        this.scene.events.emit('iceBossShoot', startX, h, angle);
+      });
+    });
+    this.scene.time.delayedCall(700, () => { if (this.active) this.clearTint(); });
   }
 
   transitionToPhase2() {
